@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="JobTrail 职迹——在一张看板中记录投递、测评、面试与 Offer，自动生成每一步进展时间线。"
+    />
+    <meta name="theme-color" content="#5b6cf9" />
+    <title>JobTrail 职迹｜求职投递进度管理</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+    <svg class="svg-sprite" aria-hidden="true">
+      <symbol id="icon-logo" viewBox="0 0 32 32">
+        <path d="M6 7.5A3.5 3.5 0 0 1 9.5 4h13A3.5 3.5 0 0 1 26 7.5v17a3.5 3.5 0 0 1-3.5 3.5h-13A3.5 3.5 0 0 1 6 24.5v-17Z" fill="currentColor" opacity=".18"/>
+        <path d="m10 17 3.2 3.2L22 11.5M11 8h10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-grid" viewBox="0 0 24 24"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="icon-message" viewBox="0 0 24 24"><path d="M5 18.5 3.7 21l3.8-1.1A9 9 0 1 0 5 18.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 12h8M8 9h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="icon-sparkle" viewBox="0 0 24 24"><path d="M12 3c.6 4.9 3.1 7.4 8 8-4.9.6-7.4 3.1-8 8-.6-4.9-3.1-7.4-8-8 4.9-.6 7.4-3.1 8-8Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-archive" viewBox="0 0 24 24"><path d="M4 7h16v13H4V7Zm-1-3h18v4H3V4Zm6 8h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m15.5 15.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="icon-kanban" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.8 4v16M15.2 4v16" stroke="currentColor" stroke-width="1.8"/></symbol>
+      <symbol id="icon-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+      <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4L8 8M5 20h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4m10.6 10.6 1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+      <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></symbol>
+      <symbol id="icon-building" viewBox="0 0 24 24"><path d="M4 21V5l10-2v18M4 21h16M14 8h5v13M8 8h2M8 12h2M8 16h2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.1 7-12a7 7 0 0 0-14 0c0 5.9 7 12 7 12Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="9" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+      <symbol id="icon-link" viewBox="0 0 24 24"><path d="m9.5 14.5 5-5M8 17H6.5a4.5 4.5 0 0 1 0-9H10m4 0h3.5a4.5 4.5 0 1 1 0 9H14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 3.5v4M16 3.5v4M3.5 10h17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-edit" viewBox="0 0 24 24"><path d="m4 20 4.2-1 10.5-10.5a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.3-13.1 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 14H7L6 7m4 4v6m4-6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4.2 4.2L19 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    </svg>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand">
+          <span class="brand-mark"><svg class="icon"><use href="#icon-logo"></use></svg></span>
+          <span>
+            <strong>JobTrail</strong>
+            <small>职迹</small>
+          </span>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="投递筛选">
+          <p class="nav-label">工作台</p>
+          <button class="nav-item is-active" type="button" data-quick-filter="all">
+            <svg class="icon"><use href="#icon-grid"></use></svg>
+            <span>全部投递</span>
+            <span class="nav-count" id="nav-total">0</span>
+          </button>
+          <button class="nav-item" type="button" data-quick-filter="due">
+            <svg class="icon"><use href="#icon-clock"></use></svg>
+            <span>待跟进</span>
+            <span class="nav-count is-alert" id="nav-due">0</span>
+          </button>
+          <button class="nav-item" type="button" data-quick-filter="interviewing">
+            <svg class="icon"><use href="#icon-message"></use></svg>
+            <span>面试中</span>
+            <span class="nav-count" id="nav-interviewing">0</span>
+          </button>
+          <button class="nav-item" type="button" data-quick-filter="offer">
+            <svg class="icon"><use href="#icon-sparkle"></use></svg>
+            <span>已收 Offer</span>
+            <span class="nav-count" id="nav-offers">0</span>
+          </button>
+          <button class="nav-item" type="button" data-quick-filter="closed">
+            <svg class="icon"><use href="#icon-archive"></use></svg>
+            <span>已结束</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="storage-note">
+            <span class="storage-icon"><svg class="icon"><use href="#icon-check"></use></svg></span>
+            <span><strong>数据仅存本机</strong><small>记得定期导出备份</small></span>
+          </div>
+          <button class="sidebar-action" type="button" id="import-button">
+            <svg class="icon"><use href="#icon-upload"></use></svg>导入备份
+          </button>
+          <button class="sidebar-action" type="button" id="export-button">
+            <svg class="icon"><use href="#icon-download"></use></svg>导出数据
+          </button>
+          <button class="sidebar-action" type="button" id="export-csv-button">
+            <svg class="icon"><use href="#icon-list"></use></svg>导出 CSV
+          </button>
+        </div>
+      </aside>
+
+      <main class="main" id="main-content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="today-label">求职工作台</p>
+            <h1>投递进展</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-button" type="button" id="theme-toggle" aria-label="切换深色模式" title="切换显示模式">
+              <svg class="icon theme-icon-light"><use href="#icon-moon"></use></svg>
+              <svg class="icon theme-icon-dark"><use href="#icon-sun"></use></svg>
+            </button>
+            <button class="button button-primary" type="button" id="add-application-button">
+              <svg class="icon"><use href="#icon-plus"></use></svg>
+              新建投递
+            </button>
+          </div>
+        </header>
+
+        <section class="dashboard" aria-label="投递概览">
+          <div class="dashboard-intro">
+            <div>
+              <p class="section-kicker">OVERVIEW</p>
+              <h2 id="welcome-heading">稳稳推进每一次机会</h2>
+              <p id="welcome-copy">把每个环节记清楚，下一步自然更从容。</p>
+            </div>
+            <div class="mini-progress" aria-label="活跃投递占比">
+              <span id="active-ratio">0%</span>
+              <small>活跃占比</small>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <article class="stat-card stat-total">
+              <div class="stat-icon"><svg class="icon"><use href="#icon-building"></use></svg></div>
+              <div><span>全部投递</span><strong id="stat-total">0</strong><small id="stat-total-copy">开始记录第一份机会</small></div>
+            </article>
+            <article class="stat-card stat-active">
+              <div class="stat-icon"><svg class="icon"><use href="#icon-arrow"></use></svg></div>
+              <div><span>进行中</span><strong id="stat-active">0</strong><small>正在推进的流程</small></div>
+            </article>
+            <article class="stat-card stat-interview">
+              <div class="stat-icon"><svg class="icon"><use href="#icon-message"></use></svg></div>
+              <div><span>面试阶段</span><strong id="stat-interviewing">0</strong><small>AI 面试及后续环节</small></div>
+            </article>
+            <article class="stat-card stat-offer">
+              <div class="stat-icon"><svg class="icon"><use href="#icon-sparkle"></use></svg></div>
+              <div><span>收到 Offer</span><strong id="stat-offers">0</strong><small>值得庆祝的结果</small></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="follow-up-panel is-hidden" id="follow-up-panel" aria-labelledby="follow-up-heading">
+          <div class="follow-up-heading-wrap">
+            <span class="follow-up-badge"><svg class="icon"><use href="#icon-clock"></use></svg></span>
+            <div><h2 id="follow-up-heading">今天需要跟进</h2><p>别让好机会停在等待里</p></div>
+          </div>
+          <div class="follow-up-list" id="follow-up-list"></div>
+        </section>
+
+        <section class="workspace-section" aria-labelledby="pipeline-heading">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">PIPELINE</p>
+              <h2 id="pipeline-heading">投递流程</h2>
+            </div>
+            <div class="section-heading-meta"><span id="visible-count">0 个机会</span></div>
+          </div>
+
+          <div class="toolbar" aria-label="筛选工具栏">
+            <label class="search-field">
+              <svg class="icon"><use href="#icon-search"></use></svg>
+              <span class="sr-only">搜索</span>
+              <input type="search" id="search-input" placeholder="搜索公司、岗位或标签" autocomplete="off" />
+              <kbd>⌘ K</kbd>
+            </label>
+            <label class="select-field">
+              <span class="sr-only">城市</span>
+              <select id="city-filter"><option value="all">全部城市</option></select>
+            </label>
+            <label class="select-field">
+              <span class="sr-only">进度</span>
+              <select id="stage-filter"><option value="all">全部进度</option></select>
+            </label>
+            <div class="view-switch" role="group" aria-label="视图切换">
+              <button type="button" class="is-active" data-view="board" aria-pressed="true" title="看板视图">
+                <svg class="icon"><use href="#icon-kanban"></use></svg><span>看板</span>
+              </button>
+              <button type="button" data-view="list" aria-pressed="false" title="列表视图">
+                <svg class="icon"><use href="#icon-list"></use></svg><span>列表</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="pipeline-board" id="pipeline-board" aria-live="polite"></div>
+          <div class="list-view is-hidden" id="list-view" aria-live="polite"></div>
+
+          <div class="empty-state is-hidden" id="empty-state">
+            <div class="empty-illustration" aria-hidden="true">
+              <span></span><span></span><span></span>
+              <svg class="icon"><use href="#icon-search"></use></svg>
+            </div>
+            <h3 id="empty-title">还没有投递记录</h3>
+            <p id="empty-copy">添加第一份投递，从此不再遗漏任何进展。</p>
+            <button class="button button-primary" type="button" id="empty-action">
+              <svg class="icon"><use href="#icon-plus"></use></svg>新建投递
+            </button>
+          </div>
+        </section>
+
+        <footer class="app-footer">
+          <span>JobTrail 职迹 · 本地优先，不上传你的求职数据</span>
+          <span>快捷键：<kbd>N</kbd> 新建 · <kbd>/</kbd> 搜索 · <kbd>E</kbd> 导出</span>
+        </footer>
+      </main>
+    </div>
+
+    <dialog class="modal application-modal" id="application-dialog">
+      <form method="dialog" class="modal-card" id="application-form">
+        <header class="modal-header">
+          <div><p class="section-kicker">APPLICATION</p><h2 id="application-dialog-title">新建投递</h2><p>先记录基本信息，流程可按公司自由增减。</p></div>
+          <button class="icon-button modal-close" type="button" data-close-dialog="application-dialog" aria-label="关闭"><svg class="icon"><use href="#icon-close"></use></svg></button>
+        </header>
+        <div class="modal-body">
+          <input type="hidden" name="applicationId" />
+          <div class="form-section">
+            <div class="form-section-title"><span>01</span><div><h3>岗位信息</h3><p>带 * 为必填项</p></div></div>
+            <div class="form-grid two-columns">
+              <label class="form-field"><span>公司名称 *</span><input name="company" required maxlength="80" placeholder="例如：星河科技" /></label>
+              <label class="form-field"><span>岗位名称 *</span><input name="position" required maxlength="100" placeholder="例如：前端开发工程师" /></label>
+              <label class="form-field"><span>城市</span><input name="city" maxlength="40" placeholder="例如：上海 / 远程" /></label>
+              <label class="form-field"><span>薪资范围</span><input name="salary" maxlength="40" placeholder="例如：25k–35k · 14薪" /></label>
+              <label class="form-field"><span>投递渠道</span><input name="source" list="source-options" maxlength="40" placeholder="请选择或自行填写" /></label>
+              <label class="form-field"><span>投递日期</span><input name="appliedAt" type="date" /></label>
+              <label class="form-field form-field-wide"><span>岗位链接</span><input name="jobUrl" type="url" placeholder="https://…" /></label>
+              <label class="form-field"><span>下次跟进</span><input name="nextFollowUp" type="date" /></label>
+              <label class="form-field"><span>联系人</span><input name="contact" maxlength="80" placeholder="姓名 / 邮箱 / 微信" /></label>
+              <label class="form-field form-field-wide"><span>标签</span><input name="tags" maxlength="160" placeholder="用逗号分隔，例如：重点，内推，远程" /></label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title"><span>02</span><div><h3>招聘流程</h3><p>取消公司没有的环节，已投递与 Offer 会保留</p></div></div>
+            <div class="pipeline-selector" id="pipeline-selector"></div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title"><span>03</span><div><h3>备注</h3><p>记录 JD 重点、准备事项或沟通信息</p></div></div>
+            <label class="form-field"><span class="sr-only">备注</span><textarea name="notes" rows="4" maxlength="1200" placeholder="例如：重点准备 React 性能优化；下周三前完成测评…"></textarea></label>
+          </div>
+        </div>
+        <footer class="modal-footer">
+          <button class="button button-ghost" type="button" data-close-dialog="application-dialog">取消</button>
+          <button class="button button-primary" type="submit" id="save-application-button"><svg class="icon"><use href="#icon-check"></use></svg>保存投递</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="drawer" id="detail-dialog">
+      <article class="drawer-card">
+        <header class="drawer-header">
+          <button class="icon-button" type="button" data-close-dialog="detail-dialog" aria-label="关闭"><svg class="icon"><use href="#icon-close"></use></svg></button>
+        </header>
+        <div class="drawer-content" id="detail-content"></div>
+      </article>
+    </dialog>
+
+    <dialog class="modal progress-modal" id="progress-dialog">
+      <form method="dialog" class="modal-card modal-card-small" id="progress-form">
+        <header class="modal-header">
+          <div><p class="section-kicker">PROGRESS</p><h2>记录本阶段</h2><p id="progress-description">完成后将自动进入下一环节。</p></div>
+          <button class="icon-button" type="button" data-close-dialog="progress-dialog" aria-label="关闭"><svg class="icon"><use href="#icon-close"></use></svg></button>
+        </header>
+        <div class="modal-body">
+          <input type="hidden" name="applicationId" />
+          <input type="hidden" name="action" value="complete" />
+          <div class="progress-current" id="progress-current"></div>
+          <label class="form-field"><span>完成时间</span><input name="completedAt" type="datetime-local" /></label>
+          <label class="form-field"><span>本阶段记录</span><textarea name="note" rows="4" maxlength="800" placeholder="例如：测评已提交；面试官关注了项目难点…"></textarea></label>
+          <label class="form-field" id="next-follow-up-field"><span>下次跟进</span><input name="nextFollowUp" type="date" /></label>
+        </div>
+        <footer class="modal-footer progress-footer">
+          <button class="button button-ghost is-danger-text" type="button" id="skip-stage-button">跳过此环节</button>
+          <div>
+            <button class="button button-ghost" type="button" data-close-dialog="progress-dialog">取消</button>
+            <button class="button button-primary" type="submit"><svg class="icon"><use href="#icon-arrow"></use></svg><span id="complete-stage-label">完成并进入下一步</span></button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="modal outcome-modal" id="outcome-dialog">
+      <form method="dialog" class="modal-card modal-card-small" id="outcome-form">
+        <header class="modal-header">
+          <div><p class="section-kicker">STATUS</p><h2>更新流程状态</h2><p>状态变化同样会写入进展时间线。</p></div>
+          <button class="icon-button" type="button" data-close-dialog="outcome-dialog" aria-label="关闭"><svg class="icon"><use href="#icon-close"></use></svg></button>
+        </header>
+        <div class="modal-body">
+          <input type="hidden" name="applicationId" />
+          <div class="outcome-options">
+            <label><input type="radio" name="status" value="paused" /><span><strong>暂时搁置</strong><small>保留在当前环节，稍后继续</small></span></label>
+            <label><input type="radio" name="status" value="rejected" /><span><strong>未通过</strong><small>结束本次招聘流程</small></span></label>
+            <label><input type="radio" name="status" value="withdrawn" /><span><strong>主动撤回</strong><small>不再继续此岗位</small></span></label>
+            <label><input type="radio" name="status" value="active" /><span><strong>重新开启</strong><small>从当前环节继续推进</small></span></label>
+          </div>
+          <label class="form-field"><span>补充说明</span><textarea name="note" rows="3" maxlength="500" placeholder="可选"></textarea></label>
+        </div>
+        <footer class="modal-footer">
+          <button class="button button-ghost" type="button" data-close-dialog="outcome-dialog">取消</button>
+          <button class="button button-primary" type="submit">保存状态</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <datalist id="source-options">
+      <option value="官网"></option><option value="Boss 直聘"></option><option value="猎聘"></option>
+      <option value="LinkedIn"></option><option value="实习僧"></option><option value="牛客"></option>
+      <option value="内推"></option><option value="校园招聘"></option><option value="其他"></option>
+    </datalist>
+    <input type="file" id="import-file" accept="application/json,.json" hidden />
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
