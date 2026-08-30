@@ -17,7 +17,7 @@ import {
   summarize,
   updateApplication,
 } from "./model.js";
-import { fetchFeishuSnapshot, mergeFeishuApplications } from "./feishu-sync.js";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js";
 import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -25,7 +25,6 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 let applications = loadApplications();
 let activeDetailId = null;
-let isSyncing = false;
 let view = ["board", "list"].includes(loadPreference("view", "board"))
   ? loadPreference("view", "board")
   : "board";
@@ -48,18 +47,13 @@ const elements = {
   progressForm: $("#progress-form"),
   outcomeDialog: $("#outcome-dialog"),
   outcomeForm: $("#outcome-form"),
-  syncDialog: $("#sync-dialog"),
-  syncForm: $("#sync-form"),
-  syncButton: $("#sync-button"),
-  syncSidebarButton: $("#sync-sidebar-button"),
-  syncSettingsButton: $("#sync-settings-button"),
-  syncSettingsSidebarButton: $("#sync-settings-sidebar-button"),
   search: $("#search-input"),
   cityFilter: $("#city-filter"),
   stageFilter: $("#stage-filter"),
   analyzeJobLinkButton: $("#analyze-job-link-button"),
   jobLinkAnalysisStatus: $("#job-link-analysis-status"),
   importFile: $("#import-file"),
+  csvImportFile: $("#csv-import-file"),
   toastRegion: $("#toast-region"),
 };
 
@@ -196,97 +190,6 @@ function showToast(message, type = "success") {
   window.setTimeout(() => toast.remove(), 3200);
 }
 
-function loadSyncSettings() {
-  return {
-    endpoint: loadPreference("feishuSyncEndpoint", "").trim(),
-    accessToken: loadPreference("feishuSyncAccessToken", "").trim(),
-    autoSync: loadPreference("feishuAutoSync", "true") !== "false",
-    lastSync: loadPreference("feishuLastSync", ""),
-    lastError: loadPreference("feishuLastError", ""),
-  };
-}
-
-function renderSyncStatus() {
-  const settings = loadSyncSettings();
-  const configured = Boolean(settings.endpoint && settings.accessToken);
-  const card = elements.syncSettingsSidebarButton;
-  card.classList.toggle("is-configured", configured && !settings.lastError);
-  card.classList.toggle("is-error", Boolean(settings.lastError));
-  card.classList.toggle("is-syncing", isSyncing);
-  elements.syncButton.classList.toggle("is-syncing", isSyncing);
-  elements.syncButton.disabled = isSyncing;
-  elements.syncSidebarButton.disabled = isSyncing;
-
-  let title = "飞书同步未配置";
-  let copy = "点击配置单向同步";
-  if (isSyncing) {
-    title = "正在读取飞书";
-    copy = "只同步投递字段";
-  } else if (settings.lastError) {
-    title = "上次同步失败";
-    copy = settings.lastError;
-  } else if (configured && settings.lastSync) {
-    title = "飞书单向同步";
-    copy = `上次 ${formatDate(settings.lastSync, dateTimeFormatter)}`;
-  } else if (configured) {
-    title = "飞书单向同步";
-    copy = settings.autoSync ? "打开页面时自动更新" : "已关闭自动同步";
-  }
-  $("#sync-status-title").textContent = title;
-  $("#sync-status-copy").textContent = copy;
-  elements.syncButton.title = configured ? "立即从飞书同步" : "配置飞书同步";
-}
-
-function openSyncSettings() {
-  const settings = loadSyncSettings();
-  elements.syncForm.elements.endpoint.value = settings.endpoint;
-  elements.syncForm.elements.accessToken.value = settings.accessToken;
-  elements.syncForm.elements.autoSync.checked = settings.autoSync;
-  elements.syncDialog.showModal();
-  window.setTimeout(() => elements.syncForm.elements.endpoint.focus(), 50);
-}
-
-async function syncFromFeishu({ silent = false } = {}) {
-  if (isSyncing) return;
-  const settings = loadSyncSettings();
-  if (!settings.endpoint || !settings.accessToken) {
-    if (!silent) openSyncSettings();
-    return;
-  }
-
-  isSyncing = true;
-  savePreference("feishuLastError", "");
-  renderSyncStatus();
-  try {
-    const snapshot = await fetchFeishuSnapshot({
-      endpoint: settings.endpoint,
-      accessToken: settings.accessToken,
-    });
-    const result = mergeFeishuApplications(applications, snapshot.records, {
-      syncedAt: snapshot.syncedAt,
-    });
-    applications = result.applications;
-    saveApplications(applications);
-    savePreference("feishuLastSync", result.syncedAt);
-    savePreference("feishuLastError", "");
-    renderAll();
-    if (!silent) {
-      const { created, updated } = result.stats;
-      showToast(created || updated
-        ? `飞书同步完成：新增 ${created} 条，更新 ${updated} 条`
-        : "飞书同步完成，暂无变化");
-    }
-  } catch (error) {
-    console.error("Feishu sync failed", error);
-    const message = error?.message || "飞书同步失败，请稍后重试";
-    savePreference("feishuLastError", message);
-    if (!silent) showToast(message, "error");
-  } finally {
-    isSyncing = false;
-    renderSyncStatus();
-  }
-}
-
 function setJobLinkAnalysisStatus(message = DEFAULT_JOB_LINK_ANALYSIS_COPY, state = "") {
   elements.jobLinkAnalysisStatus.textContent = message;
   elements.jobLinkAnalysisStatus.classList.toggle("is-success", state === "success");
@@ -415,8 +318,8 @@ function cardHtml(application) {
     : closed
       ? `<span class="tag status-tag">${escapeHtml(statusLabel(application))}</span>`
       : "";
-  const syncTag = application.sync?.source === "feishu"
-    ? `<span class="tag sync-source-tag">飞书同步</span>`
+  const importTag = application.importSource?.format === "csv"
+    ? `<span class="tag import-source-tag">CSV 导入</span>`
     : "";
   const quickButton = !closed && application.status !== "offer"
     ? `<button class="quick-progress" type="button" data-action="progress" data-id="${application.id}">${icon("arrow")}记录新进展</button>`
@@ -435,7 +338,7 @@ function cardHtml(application) {
         <span class="tag stage-tag" style="${stageStyle(stage.id)}">${escapeHtml(statusLabel(application))}</span>
         ${overdue ? `<span class="tag overdue-tag">待跟进</span>` : ""}
         ${statusTag}
-        ${syncTag}
+        ${importTag}
         ${tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
       </div>
       <div class="card-meta">
@@ -638,7 +541,7 @@ function renderDetail(applicationId) {
         ${application.salary ? `<span>${escapeHtml(application.salary)}</span>` : ""}
         ${target.href ? `<a href="${escapeHtml(target.href)}" ${target.kind === "url" ? "target=\"_blank\" rel=\"noopener noreferrer\"" : ""}>${icon("link")}${escapeHtml(target.label)}</a>` : target.value ? `<span>${icon("link")}${escapeHtml(target.value)}</span>` : ""}
       </div>
-      ${application.tags.length || application.sync?.source === "feishu" ? `<div class="detail-tags">${application.sync?.source === "feishu" ? `<span class="tag sync-source-tag">飞书单向同步</span>` : ""}${application.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+      ${application.tags.length || application.importSource?.format === "csv" ? `<div class="detail-tags">${application.importSource?.format === "csv" ? `<span class="tag import-source-tag">CSV 导入</span>` : ""}${application.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
       <div class="detail-actions">
         ${primaryAction}
         <div class="detail-secondary-actions">
@@ -765,6 +668,20 @@ function exportCsv() {
   showToast(`已导出 ${applications.length} 条 CSV 记录`);
 }
 
+async function decodeCsvFile(file) {
+  if (file.size > 10 * 1024 * 1024) throw new Error("CSV 文件超过 10 MB，请先精简后再导入");
+  const buffer = await file.arrayBuffer();
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    try {
+      return new TextDecoder("gb18030", { fatal: true }).decode(buffer);
+    } catch {
+      throw new Error("无法识别 CSV 编码，请另存为 UTF-8 CSV 后重试");
+    }
+  }
+}
+
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   savePreference("theme", theme);
@@ -780,10 +697,6 @@ function initializeTheme() {
 function setupEventListeners() {
   $("#add-application-button").addEventListener("click", () => openApplicationForm());
   $("#empty-action").addEventListener("click", () => applications.length ? resetFilters() : openApplicationForm());
-  elements.syncButton.addEventListener("click", () => syncFromFeishu());
-  elements.syncSidebarButton.addEventListener("click", () => syncFromFeishu());
-  elements.syncSettingsButton.addEventListener("click", openSyncSettings);
-  elements.syncSettingsSidebarButton.addEventListener("click", openSyncSettings);
   elements.analyzeJobLinkButton.addEventListener("click", () => analyzeCompanyFromJobUrl({ announce: true }));
   elements.applicationForm.elements.jobUrl.addEventListener("change", () => analyzeCompanyFromJobUrl());
   elements.applicationForm.elements.jobUrl.addEventListener("input", () => setJobLinkAnalysisStatus());
@@ -801,35 +714,10 @@ function setupEventListeners() {
     button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog)?.close());
   });
 
-  [elements.applicationDialog, elements.detailDialog, elements.progressDialog, elements.outcomeDialog, elements.syncDialog].forEach((dialog) => {
+  [elements.applicationDialog, elements.detailDialog, elements.progressDialog, elements.outcomeDialog].forEach((dialog) => {
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
     });
-  });
-
-  elements.syncForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    if (!elements.syncForm.reportValidity()) return;
-    savePreference("feishuSyncEndpoint", formValue(elements.syncForm, "endpoint").trim());
-    savePreference("feishuSyncAccessToken", formValue(elements.syncForm, "accessToken").trim());
-    savePreference("feishuAutoSync", String(elements.syncForm.elements.autoSync.checked));
-    savePreference("feishuLastError", "");
-    elements.syncDialog.close();
-    renderSyncStatus();
-    syncFromFeishu();
-  });
-
-  $("#clear-sync-settings-button").addEventListener("click", () => {
-    for (const key of [
-      "feishuSyncEndpoint",
-      "feishuSyncAccessToken",
-      "feishuLastSync",
-      "feishuLastError",
-    ]) savePreference(key, "");
-    savePreference("feishuAutoSync", "true");
-    elements.syncDialog.close();
-    renderSyncStatus();
-    showToast("飞书同步设置已清除；现有投递记录仍保留");
   });
 
   elements.applicationForm.addEventListener("submit", (event) => {
@@ -979,6 +867,34 @@ function setupEventListeners() {
   });
   $("#export-button").addEventListener("click", exportJson);
   $("#export-csv-button")?.addEventListener("click", exportCsv);
+  $("#import-csv-button").addEventListener("click", () => elements.csvImportFile.click());
+  $("#import-csv-top-button").addEventListener("click", () => elements.csvImportFile.click());
+  elements.csvImportFile.addEventListener("change", async () => {
+    const file = elements.csvImportFile.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = readJobCsv(await decodeCsvFile(file), {
+        fallbackAppliedAt: localDateString(),
+      });
+      if (!parsed.records.length) throw new Error("CSV 中没有同时填写公司和岗位的记录");
+      if (parsed.stats.fallbackDateCount) {
+        const confirmed = window.confirm(
+          `CSV 中有 ${parsed.stats.fallbackDateCount} 条记录没有有效投递日期，将以今天作为导入日期。是否继续？`,
+        );
+        if (!confirmed) return;
+      }
+      const result = mergeCsvApplications(applications, parsed.records);
+      applications = result.applications;
+      const skipped = parsed.stats.skippedMissingRequired + parsed.stats.skippedDuplicates;
+      persist(`CSV 导入完成：新增 ${result.stats.created}，更新 ${result.stats.updated}，跳过 ${skipped}`);
+      resetFilters();
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "CSV 导入失败，请检查列名和文件内容", "error");
+    } finally {
+      elements.csvImportFile.value = "";
+    }
+  });
   $("#import-button").addEventListener("click", () => elements.importFile.click());
   elements.importFile.addEventListener("change", async () => {
     const file = elements.importFile.files?.[0];
@@ -1044,13 +960,7 @@ function initialize() {
   }).format(new Date());
   setupEventListeners();
   renderAll();
-  renderSyncStatus();
   document.documentElement.dataset.appReady = "true";
-
-  const syncSettings = loadSyncSettings();
-  if (syncSettings.endpoint && syncSettings.accessToken && syncSettings.autoSync) {
-    window.setTimeout(() => syncFromFeishu({ silent: true }), 250);
-  }
 
   if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
     window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(console.warn));

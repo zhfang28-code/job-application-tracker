@@ -32,8 +32,6 @@
       <symbol id="icon-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
       <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4L8 8M5 20h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-      <symbol id="icon-sync" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M18.4 10A7 7 0 0 0 6.6 7.4L4 10m16 4-2.6 2.6A7 7 0 0 1 5.6 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-      <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4m10.6 10.6 1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
       <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
       <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -88,12 +86,12 @@
         </nav>
 
         <div class="sidebar-bottom">
-          <button class="storage-note" type="button" id="sync-settings-sidebar-button">
-            <span class="storage-icon" id="sync-status-icon"><svg class="icon"><use href="#icon-sync"></use></svg></span>
-            <span><strong id="sync-status-title">飞书同步未配置</strong><small id="sync-status-copy">点击配置单向同步</small></span>
-          </button>
-          <button class="sidebar-action" type="button" id="sync-sidebar-button">
-            <svg class="icon"><use href="#icon-sync"></use></svg>立即同步
+          <div class="storage-note">
+            <span class="storage-icon"><svg class="icon"><use href="#icon-check"></use></svg></span>
+            <span><strong>数据仅存本机</strong><small>记得定期导出备份</small></span>
+          </div>
+          <button class="sidebar-action" type="button" id="import-csv-button">
+            <svg class="icon"><use href="#icon-upload"></use></svg>导入投递 CSV
           </button>
           <button class="sidebar-action" type="button" id="import-button">
             <svg class="icon"><use href="#icon-upload"></use></svg>导入备份
@@ -114,11 +112,8 @@
             <h1>投递进展</h1>
           </div>
           <div class="topbar-actions">
-            <button class="button button-ghost sync-button" type="button" id="sync-button" title="立即从飞书同步">
-              <svg class="icon"><use href="#icon-sync"></use></svg><span class="sync-button-label">飞书同步</span>
-            </button>
-            <button class="icon-button" type="button" id="sync-settings-button" aria-label="飞书同步设置" title="飞书同步设置">
-              <svg class="icon"><use href="#icon-settings"></use></svg>
+            <button class="button button-ghost csv-import-top-button" type="button" id="import-csv-top-button" title="导入投递 CSV" aria-label="导入投递 CSV">
+              <svg class="icon"><use href="#icon-upload"></use></svg><span class="csv-import-label">导入 CSV</span>
             </button>
             <button class="icon-button" type="button" id="theme-toggle" aria-label="切换深色模式" title="切换显示模式">
               <svg class="icon theme-icon-light"><use href="#icon-moon"></use></svg>
@@ -345,42 +340,7 @@
       </form>
     </dialog>
 
-    <dialog class="modal sync-modal" id="sync-dialog">
-      <form method="dialog" class="modal-card modal-card-small" id="sync-form" autocomplete="off">
-        <header class="modal-header">
-          <div><p class="section-kicker">FEISHU SYNC</p><h2>飞书单向同步</h2><p>打开 JobTrail 时自动读取飞书，不会回写飞书。</p></div>
-          <button class="icon-button" type="button" data-close-dialog="sync-dialog" aria-label="关闭"><svg class="icon"><use href="#icon-close"></use></svg></button>
-        </header>
-        <div class="modal-body">
-          <div class="sync-security-note">
-            <span class="sync-security-icon"><svg class="icon"><use href="#icon-check"></use></svg></span>
-            <div><strong>严格按白名单同步</strong><p>只读取投递公司、链接或邮箱、投递时间、岗位和目前进度；不读取简历，也不会把飞书 App Secret 放进网页或 GitHub。</p></div>
-          </div>
-          <label class="form-field">
-            <span>同步服务地址 *</span>
-            <input name="endpoint" type="url" required placeholder="https://你的云函数地址" aria-describedby="sync-endpoint-help" />
-            <small id="sync-endpoint-help">需使用部署在中国大陆、支持 HTTPS 的只读云函数。</small>
-          </label>
-          <label class="form-field">
-            <span>同步访问密钥 *</span>
-            <input name="accessToken" type="password" required minlength="16" placeholder="至少 16 位（不是飞书 App Secret）" aria-describedby="sync-token-help" />
-            <small id="sync-token-help">仅保存在当前浏览器，不会包含在导出文件或 GitHub 代码中。</small>
-          </label>
-          <label class="sync-checkbox">
-            <input name="autoSync" type="checkbox" checked />
-            <span><strong>打开页面时自动同步</strong><small>页面关闭期间不会在后台运行。</small></span>
-          </label>
-        </div>
-        <footer class="modal-footer sync-footer">
-          <button class="text-button is-danger-text" type="button" id="clear-sync-settings-button">清除同步设置</button>
-          <div>
-            <button class="button button-ghost" type="button" data-close-dialog="sync-dialog">取消</button>
-            <button class="button button-primary" type="submit"><svg class="icon"><use href="#icon-sync"></use></svg>保存并同步</button>
-          </div>
-        </footer>
-      </form>
-    </dialog>
-
+    <input type="file" id="csv-import-file" accept="text/csv,.csv" hidden />
     <input type="file" id="import-file" accept="application/json,.json" hidden />
     <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
 

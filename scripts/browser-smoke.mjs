@@ -115,14 +115,6 @@ try {
   client.browserExceptions.length = 0;
   assert.equal(await evaluate(client, "document.querySelectorAll('.application-card').length"), 0);
 
-  await evaluate(client, "document.querySelector('#sync-button').click(); true");
-  await waitFor(client, "document.querySelector('#sync-dialog').open");
-  assert.equal(await evaluate(client, "document.querySelector('#sync-form').textContent.includes('不读取简历')"), true);
-  assert.equal(await evaluate(client, "document.querySelector('#sync-form').elements.endpoint.required && document.querySelector('#sync-form').elements.accessToken.required"), true);
-  await sleep(250);
-  await saveScreenshot(client, "feishu-sync-settings-desktop.png");
-  await evaluate(client, "document.querySelector('[data-close-dialog=\"sync-dialog\"]').click(); true");
-
   await evaluate(client, "document.querySelector('#add-application-button').click(); true");
   await waitFor(client, "document.querySelector('#application-dialog').open");
   await sleep(250);
@@ -183,6 +175,27 @@ try {
   await saveScreenshot(client, "detail-desktop.png");
   await evaluate(client, "document.querySelector('[data-close-dialog=\"detail-dialog\"]').click(); true");
 
+  await evaluate(client, `(() => {
+    window.confirm = () => true;
+    const csv = [
+      '单位,岗位,城市|工作地,投递链接,状态,测评|笔试,简历附件',
+      '远山科技,后端工程师,北京,jobs@example.com,需线上测评,,resume.pdf'
+    ].join('\\n');
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([csv], 'applications.csv', { type: 'text/csv' }));
+    const input = document.querySelector('#csv-import-file');
+    Object.defineProperty(input, 'files', { value: transfer.files, configurable: true });
+    input.dispatchEvent(new Event('change'));
+    return true;
+  })()`);
+  await waitFor(client, "document.querySelector('#stat-total')?.textContent === '2' && document.body.textContent.includes('远山科技')");
+  const csvImported = await evaluate(client, `(() => {
+    const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
+    const app = payload.applications.find((item) => item.company === '远山科技');
+    return { currentStageId: app.currentStageId, email: app.applicationEmail, source: app.importSource?.format };
+  })()`);
+  assert.deepEqual(csvImported, { currentStageId: "assessment", email: "jobs@example.com", source: "csv" });
+
   await saveScreenshot(client, "filled-desktop.png");
   await client.send("Emulation.setDeviceMetricsOverride", {
     width: 390,
@@ -198,7 +211,7 @@ try {
   await saveScreenshot(client, "new-application-mobile.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: Feishu settings → create → choose actual next stage → timeline → responsive render");
+  console.log("Browser smoke test passed: create → progress → CSV import → timeline → responsive render");
 } finally {
   client.close();
 }

@@ -285,17 +285,16 @@ function normalizeApplicationTarget(input = {}) {
   return { jobUrl, applicationEmail };
 }
 
-function normalizeSyncMetadata(sync) {
-  if (!sync || typeof sync !== "object") return null;
-  const source = cleanText(sync.source);
-  const recordId = cleanText(sync.recordId);
-  if (!source || !recordId) return null;
+function normalizeImportSource(source) {
+  if (!source || typeof source !== "object") return null;
+  const format = cleanText(source.format);
+  const recordKey = cleanText(source.recordKey);
+  if (format !== "csv" || !recordKey) return null;
   return {
-    source,
-    recordId,
-    progress: cleanText(sync.progress),
-    sourceUpdatedAt: sync.sourceUpdatedAt ? toIsoDate(sync.sourceUpdatedAt) : "",
-    syncedAt: sync.syncedAt ? toIsoDate(sync.syncedAt) : "",
+    format,
+    recordKey,
+    progress: cleanText(source.progress),
+    importedAt: source.importedAt ? toIsoDate(source.importedAt) : "",
   };
 }
 
@@ -336,7 +335,7 @@ export function createApplication(input = {}, now = new Date()) {
         note: "创建投递记录",
       },
     ],
-    sync: normalizeSyncMetadata(input.sync),
+    importSource: normalizeImportSource(input.importSource),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -383,7 +382,7 @@ export function normalizeApplication(raw) {
     currentStageId,
     status,
     timeline,
-    sync: normalizeSyncMetadata(raw?.sync),
+    importSource: normalizeImportSource(raw?.importSource),
     createdAt: timestamp,
     updatedAt: toIsoDate(raw?.updatedAt ?? timestamp),
   };

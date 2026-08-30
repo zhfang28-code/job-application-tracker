@@ -7,6 +7,3 @@ node_modules/
 coverage/
 screenshots/
 .tools/
-.env
-.env.local
-server/**/.env

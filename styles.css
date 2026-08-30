@@ -228,23 +228,13 @@ a { color: inherit; }
 
 .storage-note {
   display: flex;
-  width: 100%;
   gap: 10px;
   margin-bottom: 10px;
   padding: 11px;
   border: 1px solid var(--line);
   border-radius: 11px;
   background: var(--surface-soft);
-  color: var(--text);
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-  transition: 0.18s ease;
 }
-
-.storage-note:hover { border-color: var(--line-strong); transform: translateY(-1px); }
-.storage-note.is-configured .storage-icon { background: var(--primary-soft); color: var(--primary); }
-.storage-note.is-error .storage-icon { background: var(--red-soft); color: var(--red); }
 
 .storage-icon {
   display: grid;
@@ -269,11 +259,6 @@ a { color: inherit; }
 }
 
 .sidebar-action:hover { background: var(--surface-soft); color: var(--text); }
-
-.sync-button.is-syncing .icon,
-.storage-note.is-syncing .storage-icon .icon { animation: sync-spin 0.85s linear infinite; }
-
-@keyframes sync-spin { to { transform: rotate(360deg); } }
 
 .main {
   width: 100%;
@@ -767,48 +752,7 @@ dialog::backdrop {
 .field-hint.is-success { color: var(--green); }
 .field-hint.is-warning { color: var(--orange); }
 
-.sync-security-note {
-  display: flex;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--green) 22%, var(--line));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--green) 5%, var(--surface-soft));
-}
-
-.sync-security-icon {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 10px;
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.sync-security-note strong { display: block; color: var(--text); font-size: 11px; }
-.sync-security-note p { margin: 4px 0 0; color: var(--text-soft); font-size: 9px; line-height: 1.65; }
-
-.sync-checkbox {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 13px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-.sync-checkbox input { width: 16px; height: 16px; margin: 1px 0 0; accent-color: var(--primary); }
-.sync-checkbox span { display: block; }
-.sync-checkbox strong,
-.sync-checkbox small { display: block; }
-.sync-checkbox strong { color: var(--text); font-size: 10px; }
-.sync-checkbox small { margin-top: 3px; color: var(--text-faint); font-size: 8px; }
-.sync-footer > div { display: flex; gap: 8px; }
-
-.sync-source-tag { border-color: color-mix(in srgb, var(--primary) 28%, var(--line)); color: var(--primary); }
+.import-source-tag { border-color: color-mix(in srgb, var(--primary) 28%, var(--line)); color: var(--primary); }
 
 .dynamic-flow-note { display: flex; gap: 13px; padding: 15px; border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--primary) 5%, var(--surface-soft)); }
 .dynamic-flow-icon { display: grid; width: 37px; height: 37px; flex: 0 0 auto; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--primary) 13%, var(--surface)); color: var(--primary); }
@@ -966,10 +910,9 @@ dialog::backdrop {
   .topbar { min-height: 70px; }
   .topbar h1 { font-size: 18px; }
   .eyebrow { display: none; }
-  .topbar-actions { gap: 6px; }
   .topbar .button { padding-inline: 12px; }
-  .topbar .sync-button { width: 39px; padding: 0; }
-  .sync-button-label { display: none; }
+  .topbar .csv-import-top-button { width: 39px; padding: 0; }
+  .csv-import-label { display: none; }
   .dashboard { margin-top: 21px; }
   .dashboard-intro { align-items: flex-start; }
   .dashboard-intro h2 { font-size: 21px; }
@@ -1003,8 +946,6 @@ dialog::backdrop {
   .progress-footer { align-items: stretch; flex-direction: column-reverse; }
   .progress-footer > div { display: grid; grid-template-columns: 1fr 1.4fr; }
   .progress-footer > .button { width: 100%; }
-  .sync-footer { align-items: stretch; flex-direction: column-reverse; }
-  .sync-footer > div { display: grid; grid-template-columns: 1fr 1.5fr; }
   .application-table thead { display: none; }
   .application-table,
   .application-table tbody,
