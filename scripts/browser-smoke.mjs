@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const debugPort = process.env.JOBTRAIL_CDP_PORT ?? "9333";
 const baseUrl = `http://127.0.0.1:${debugPort}`;
 const appUrl = process.env.JOBTRAIL_URL ?? "http://127.0.0.1:4173/";
 const screenshotDir = process.env.JOBTRAIL_SCREENSHOT_DIR ?? join(process.cwd(), "screenshots");
+
+await mkdir(screenshotDir, { recursive: true });
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -115,6 +117,8 @@ try {
 
   await evaluate(client, "document.querySelector('#add-application-button').click(); true");
   await waitFor(client, "document.querySelector('#application-dialog').open");
+  await sleep(250);
+  await saveScreenshot(client, "new-application-desktop.png");
 
   await evaluate(client, `(() => {
     const form = document.querySelector('#application-form');
@@ -127,9 +131,6 @@ try {
     form.elements.nextFollowUp.value = '2026-08-30';
     form.elements.tags.value = '重点，内推';
     form.elements.notes.value = '重点准备 React 性能优化与项目难点。';
-    for (const id of ['assessment', 'ai-interview', 'second-interview', 'final-interview', 'hr-interview']) {
-      form.querySelector('[name="pipeline"][value="' + id + '"]').checked = false;
-    }
     form.requestSubmit();
     return true;
   })()`);
@@ -146,8 +147,11 @@ try {
 
   await evaluate(client, "document.querySelector('[data-action=\"progress\"]').click(); true");
   await waitFor(client, "document.querySelector('#progress-dialog').open");
+  await sleep(250);
+  await saveScreenshot(client, "progress-desktop.png");
   await evaluate(client, `(() => {
     const form = document.querySelector('#progress-form');
+    form.elements.nextStageId.value = 'first-interview';
     form.elements.note.value = '网申已确认，直接进入一面';
     form.requestSubmit();
     return true;
@@ -179,7 +183,7 @@ try {
   await saveScreenshot(client, "filled-mobile.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: create → customize pipeline → advance → timeline → responsive render");
+  console.log("Browser smoke test passed: create → choose actual next stage → timeline → responsive render");
 } finally {
   client.close();
 }

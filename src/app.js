@@ -1,5 +1,4 @@
 import {
-  DEFAULT_PIPELINE,
   INTERVIEW_STAGE_IDS,
   STAGES,
   applicationProgress,
@@ -13,7 +12,6 @@ import {
   moveToStage,
   parseImportPayload,
   setOutcome,
-  skipCurrentStage,
   stageById,
   summarize,
   updateApplication,
@@ -50,7 +48,6 @@ const elements = {
   search: $("#search-input"),
   cityFilter: $("#city-filter"),
   stageFilter: $("#stage-filter"),
-  pipelineSelector: $("#pipeline-selector"),
   importFile: $("#import-file"),
   toastRegion: $("#toast-region"),
 };
@@ -176,27 +173,11 @@ function showToast(message, type = "success") {
   window.setTimeout(() => toast.remove(), 3200);
 }
 
-function renderPipelineSelector(selected = DEFAULT_PIPELINE, locked = new Set()) {
-  const checked = new Set(selected);
-  elements.pipelineSelector.innerHTML = STAGES.map((stage) => {
-    const required = ["applied", "offer"].includes(stage.id) || locked.has(stage.id);
-    return `
-      <label class="stage-check" style="${stageStyle(stage.id)}">
-        <input type="checkbox" name="pipeline" value="${stage.id}" ${checked.has(stage.id) ? "checked" : ""} ${required ? "disabled" : ""} />
-        <span><i aria-hidden="true"></i>${escapeHtml(stage.label)}</span>
-      </label>`;
-  }).join("");
-}
-
 function formValue(form, name) {
   return new FormData(form).get(name)?.toString() ?? "";
 }
 
 function applicationFormPayload(form) {
-  const formData = new FormData(form);
-  const pipeline = formData.getAll("pipeline").map(String);
-  // Disabled required checkboxes are absent from FormData.
-  pipeline.push("applied", "offer");
   return {
     company: formValue(form, "company"),
     position: formValue(form, "position"),
@@ -209,7 +190,6 @@ function applicationFormPayload(form) {
     contact: formValue(form, "contact"),
     tags: formValue(form, "tags"),
     notes: formValue(form, "notes"),
-    pipeline,
   };
 }
 
@@ -224,7 +204,6 @@ function openApplicationForm(application = null) {
     submitLabel.lastChild.textContent = "保存投递";
     idField.value = "";
     elements.applicationForm.elements.appliedAt.value = localDateString();
-    renderPipelineSelector(DEFAULT_PIPELINE);
   } else {
     title.textContent = "编辑投递";
     submitLabel.lastChild.textContent = "保存修改";
@@ -234,9 +213,6 @@ function openApplicationForm(application = null) {
     }
     elements.applicationForm.elements.appliedAt.value = formatDateInput(application.appliedAt);
     elements.applicationForm.elements.tags.value = application.tags.join("，");
-    const locked = new Set(application.timeline.map((event) => event.stageId));
-    locked.add(application.currentStageId);
-    renderPipelineSelector(application.pipeline, locked);
   }
   elements.applicationDialog.showModal();
   window.setTimeout(() => elements.applicationForm.elements.company.focus(), 50);
@@ -280,7 +256,7 @@ function cardHtml(application) {
       ? `<span class="tag status-tag">${escapeHtml(statusLabel(application))}</span>`
       : "";
   const quickButton = !closed && application.status !== "offer"
-    ? `<button class="quick-progress" type="button" data-action="progress" data-id="${application.id}">${icon("arrow")}记录本阶段</button>`
+    ? `<button class="quick-progress" type="button" data-action="progress" data-id="${application.id}">${icon("arrow")}记录新进展</button>`
     : "";
 
   return `
@@ -479,7 +455,7 @@ function renderDetail(applicationId) {
   const closed = ["rejected", "withdrawn"].includes(application.status);
   const statusClass = application.status === "offer" ? " is-offer" : closed ? " is-closed" : "";
   const primaryAction = !closed && application.status !== "offer"
-    ? `<button class="button button-primary" type="button" data-detail-action="progress">${icon("arrow")}记录「${escapeHtml(stage.shortLabel)}」并推进</button>`
+    ? `<button class="button button-primary" type="button" data-detail-action="progress">${icon("arrow")}记录公司通知的下一步</button>`
     : application.status === "offer"
       ? `<button class="button button-ghost" type="button" data-detail-action="status">${icon("sparkle")}更新最终状态</button>`
       : `<button class="button button-primary" type="button" data-detail-action="status">${icon("arrow")}重新开启流程</button>`;
@@ -510,7 +486,7 @@ function renderDetail(applicationId) {
     </section>
 
     <section class="detail-section">
-      <div class="detail-section-header"><h3>招聘流程</h3><small>${application.pipeline.length} 个环节 · 完成度 ${applicationProgress(application)}%</small></div>
+      <div class="detail-section-header"><h3>招聘流程</h3><small>按公司实际通知自动生成 · ${application.pipeline.length} 个环节</small></div>
       <div class="route-steps">${routeHtml(application)}</div>
       ${!closed && application.status !== "offer" ? `<div class="stage-jump"><label class="form-field"><span>快速调整当前进度</span><select id="stage-jump-select">${jumpOptions}</select></label><button class="button button-ghost button-small" type="button" data-detail-action="jump-stage">更新</button></div>` : ""}
     </section>
@@ -541,19 +517,22 @@ function openProgress(applicationId) {
   if (!application || ["offer", "rejected", "withdrawn"].includes(application.status)) return;
   const stage = stageById(application.currentStageId);
   const currentIndex = application.pipeline.indexOf(application.currentStageId);
-  const nextStageId = application.pipeline[currentIndex + 1];
-  const nextStage = nextStageId ? stageById(nextStageId) : null;
+  const unavailableStageIds = new Set(application.pipeline.slice(0, currentIndex + 1));
+  const availableStages = STAGES.filter(
+    (candidate) => candidate.id !== "applied" && !unavailableStageIds.has(candidate.id),
+  );
   elements.progressForm.reset();
   elements.progressForm.elements.applicationId.value = application.id;
-  elements.progressForm.elements.action.value = "complete";
   elements.progressForm.elements.completedAt.value = localDateTimeString();
   elements.progressForm.elements.nextFollowUp.value = application.nextFollowUp || "";
-  $("#progress-current").innerHTML = `<span class="stage-bubble" style="${stageStyle(stage.id)}">${escapeHtml(stage.shortLabel.slice(0, 2))}</span><span><strong>${escapeHtml(stage.label)}</strong><small>${nextStage ? `完成后进入「${escapeHtml(nextStage.label)}」` : "完成最后一个环节"}</small></span>`;
-  $("#progress-description").textContent = nextStage ? `完成后将自动进入「${nextStage.label}」，并写入时间线。` : "完成后将记录最终结果。";
-  $("#complete-stage-label").textContent = nextStageId === "offer" ? "完成并记录 Offer" : "完成并进入下一步";
-  $("#skip-stage-button").classList.toggle("is-hidden", !nextStage || application.currentStageId === "applied");
+  elements.progressForm.elements.nextStageId.innerHTML = `
+    <option value="">请选择已确认的下一环节</option>
+    ${availableStages.map((candidate) => `<option value="${candidate.id}">${escapeHtml(candidate.label)}</option>`).join("")}`;
+  $("#progress-current").innerHTML = `<span class="stage-bubble" style="${stageStyle(stage.id)}">${escapeHtml(stage.shortLabel.slice(0, 2))}</span><span><strong>当前：${escapeHtml(stage.label)}</strong><small>下一步以公司实际通知为准</small></span>`;
+  $("#progress-description").textContent = "选择公司已经确认的下一环节，系统会按真实顺序补进流程。";
+  $("#complete-stage-label").textContent = "保存并进入下一环节";
   elements.progressDialog.showModal();
-  window.setTimeout(() => elements.progressForm.elements.note.focus(), 50);
+  window.setTimeout(() => elements.progressForm.elements.nextStageId.focus(), 50);
 }
 
 function openOutcome(applicationId) {
@@ -679,18 +658,13 @@ function setupEventListeners() {
       at: formValue(elements.progressForm, "completedAt"),
       note: formValue(elements.progressForm, "note"),
       nextFollowUp: formValue(elements.progressForm, "nextFollowUp"),
+      nextStageId: formValue(elements.progressForm, "nextStageId"),
     };
-    const action = formValue(elements.progressForm, "action");
-    const updated = action === "skip" ? skipCurrentStage(existing, details) : completeCurrentStage(existing, details);
+    const updated = completeCurrentStage(existing, details);
     updateApplicationInState(updated);
-    persist(action === "skip" ? "已跳过此环节并记录" : "进展已记录，已进入下一步");
+    persist(`进展已记录，已进入「${stageById(updated.currentStageId).label}」`);
     elements.progressDialog.close();
     renderAll();
-  });
-
-  $("#skip-stage-button").addEventListener("click", () => {
-    elements.progressForm.elements.action.value = "skip";
-    elements.progressForm.requestSubmit();
   });
 
   elements.outcomeForm.addEventListener("submit", (event) => {

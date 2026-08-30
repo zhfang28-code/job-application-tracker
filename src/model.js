@@ -13,6 +13,7 @@ export const STAGES = Object.freeze([
 ]);
 
 export const DEFAULT_PIPELINE = STAGES.map((stage) => stage.id);
+export const INITIAL_PIPELINE = Object.freeze(["applied", "offer"]);
 export const STAGE_IDS = new Set(DEFAULT_PIPELINE);
 export const INTERVIEW_STAGE_IDS = new Set([
   "ai-interview",
@@ -54,19 +55,27 @@ export function stageById(stageId) {
 }
 
 export function normalizePipeline(pipeline = DEFAULT_PIPELINE) {
-  const requested = new Set(Array.isArray(pipeline) ? pipeline : DEFAULT_PIPELINE);
-  requested.add("applied");
-  requested.add("offer");
-  return STAGES.filter((stage) => requested.has(stage.id)).map((stage) => stage.id);
+  const requested = Array.isArray(pipeline) ? pipeline : DEFAULT_PIPELINE;
+  const seen = new Set(["applied", "offer"]);
+  const orderedStages = [];
+
+  for (const stageId of requested) {
+    if (!STAGE_IDS.has(stageId) || seen.has(stageId)) continue;
+    orderedStages.push(stageId);
+    seen.add(stageId);
+  }
+
+  // The actual middle stages keep the order in which the company arranged them.
+  return ["applied", ...orderedStages, "offer"];
 }
 
 function cleanText(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
 
-export function createApplication(input, now = new Date()) {
+export function createApplication(input = {}, now = new Date()) {
   const timestamp = toIsoDate(now);
-  const pipeline = normalizePipeline(input.pipeline);
+  const pipeline = normalizePipeline(input.pipeline ?? INITIAL_PIPELINE);
   const appliedAt = input.appliedAt
     ? toIsoDate(`${input.appliedAt}T12:00:00`)
     : timestamp;
@@ -159,7 +168,13 @@ export function updateApplication(application, input, now = new Date()) {
   // A stage already reached must stay in the route so history never disappears.
   const reachedStages = new Set(original.timeline.map((event) => event.stageId));
   reachedStages.add(original.currentStageId);
-  const safePipeline = normalizePipeline([...pipeline, ...reachedStages]);
+  const reachedInOrder = original.pipeline.filter((stageId) => reachedStages.has(stageId));
+  const safePipeline = input.pipeline == null
+    ? original.pipeline
+    : normalizePipeline([
+        ...reachedInOrder,
+        ...pipeline.filter((stageId) => !reachedStages.has(stageId)),
+      ]);
 
   return {
     ...original,
@@ -191,8 +206,34 @@ export function completeCurrentStage(application, details = {}, now = new Date()
   if (TERMINAL_STATUSES.has(app.status)) return app;
 
   const timestamp = toIsoDate(details.at ?? now);
-  const currentIndex = app.pipeline.indexOf(app.currentStageId);
-  const nextStageId = app.pipeline[currentIndex + 1];
+  let pipeline = [...app.pipeline];
+  const currentIndex = pipeline.indexOf(app.currentStageId);
+  const requestedNextStageId = cleanText(details.nextStageId);
+  let nextStageId = pipeline[currentIndex + 1];
+
+  if (
+    STAGE_IDS.has(requestedNextStageId)
+    && requestedNextStageId !== "applied"
+    && requestedNextStageId !== app.currentStageId
+  ) {
+    const requestedIndex = pipeline.indexOf(requestedNextStageId);
+    if (requestedIndex > currentIndex) {
+      // Choosing a later known stage removes speculative stages that never happened.
+      pipeline = normalizePipeline([
+        ...pipeline.slice(0, currentIndex + 1),
+        ...pipeline.slice(requestedIndex),
+      ]);
+      nextStageId = requestedNextStageId;
+    } else if (requestedIndex === -1) {
+      // A newly announced stage is inserted directly after the current real stage.
+      pipeline = normalizePipeline([
+        ...pipeline.slice(0, currentIndex + 1),
+        requestedNextStageId,
+        ...pipeline.slice(currentIndex + 1),
+      ]);
+      nextStageId = requestedNextStageId;
+    }
+  }
   const timeline = [
     ...app.timeline,
     {
@@ -207,6 +248,7 @@ export function completeCurrentStage(application, details = {}, now = new Date()
   if (!nextStageId || app.currentStageId === "offer") {
     return {
       ...app,
+      pipeline,
       status: "offer",
       currentStageId: "offer",
       nextFollowUp: "",
@@ -225,6 +267,7 @@ export function completeCurrentStage(application, details = {}, now = new Date()
 
   return {
     ...app,
+    pipeline,
     currentStageId: nextStageId,
     status: nextStageId === "offer" ? "offer" : "active",
     nextFollowUp: cleanText(details.nextFollowUp),

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   DEFAULT_PIPELINE,
+  INITIAL_PIPELINE,
   applicationProgress,
   completeCurrentStage,
   createApplication,
@@ -40,6 +41,48 @@ test("创建投递会规范流程并写入初始时间线", () => {
   assert.equal(application.timeline.length, 1);
   assert.equal(application.timeline[0].type, "entered");
   assert.equal(application.timeline[0].note, "创建投递记录");
+});
+
+test("新建投递无需预先知道招聘流程", () => {
+  const application = createApplication({
+    company: "星河科技",
+    position: "前端工程师",
+  }, NOW);
+
+  assert.deepEqual(application.pipeline, INITIAL_PIPELINE);
+  assert.equal(application.currentStageId, "applied");
+});
+
+test("收到通知后按公司的真实顺序动态补充环节", () => {
+  const application = createApplication({ company: "云帆", position: "算法工程师" }, NOW);
+  const firstRound = completeCurrentStage(application, {
+    nextStageId: "first-interview",
+    note: "收到一面邀请",
+  }, NOW);
+  const hrRound = completeCurrentStage(firstRound, {
+    nextStageId: "hr-interview",
+    note: "一面通过",
+  }, new Date("2026-08-31T08:00:00.000Z"));
+
+  assert.deepEqual(firstRound.pipeline, ["applied", "first-interview", "offer"]);
+  assert.equal(firstRound.currentStageId, "first-interview");
+  assert.deepEqual(hrRound.pipeline, ["applied", "first-interview", "hr-interview", "offer"]);
+  assert.equal(hrRound.currentStageId, "hr-interview");
+});
+
+test("选择较后的已知环节会移除未发生的预设环节", () => {
+  const application = sample();
+  const updated = completeCurrentStage(application, { nextStageId: "first-interview" }, NOW);
+
+  assert.deepEqual(updated.pipeline, [
+    "applied",
+    "first-interview",
+    "second-interview",
+    "final-interview",
+    "hr-interview",
+    "offer",
+  ]);
+  assert.equal(updated.timeline.some((event) => event.type === "skipped"), false);
 });
 
 test("完成阶段会自动进入公司实际存在的下一环节", () => {

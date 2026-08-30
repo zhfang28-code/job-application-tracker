@@ -243,8 +243,17 @@
           </div>
 
           <div class="form-section">
-            <div class="form-section-title"><span>02</span><div><h3>招聘流程</h3><p>取消公司没有的环节，已投递与 Offer 会保留</p></div></div>
-            <div class="pipeline-selector" id="pipeline-selector"></div>
+            <div class="form-section-title"><span>02</span><div><h3>招聘流程</h3><p>不需要提前知道公司的完整安排</p></div></div>
+            <div class="dynamic-flow-note">
+              <span class="dynamic-flow-icon"><svg class="icon"><use href="#icon-sparkle"></use></svg></span>
+              <div>
+                <strong>收到通知后，再记录真实的下一步</strong>
+                <p>新建后从“已投递”开始。公司通知在线测试、AI 面试或一面时，点击“记录进展”选择对应环节；公司没有的环节无需操作。</p>
+                <div class="dynamic-flow-preview" aria-label="动态记录流程示意">
+                  <span>已投递</span><i>→</i><span>等待通知</span><i>→</i><span>按实际进展添加</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="form-section">
@@ -271,22 +280,27 @@
     <dialog class="modal progress-modal" id="progress-dialog">
       <form method="dialog" class="modal-card modal-card-small" id="progress-form">
         <header class="modal-header">
-          <div><p class="section-kicker">PROGRESS</p><h2>记录本阶段</h2><p id="progress-description">完成后将自动进入下一环节。</p></div>
+          <div><p class="section-kicker">PROGRESS</p><h2>记录新进展</h2><p id="progress-description">选择公司已经确认的下一环节。</p></div>
           <button class="icon-button" type="button" data-close-dialog="progress-dialog" aria-label="关闭"><svg class="icon"><use href="#icon-close"></use></svg></button>
         </header>
         <div class="modal-body">
           <input type="hidden" name="applicationId" />
-          <input type="hidden" name="action" value="complete" />
           <div class="progress-current" id="progress-current"></div>
+          <label class="form-field">
+            <span>公司通知的下一环节 *</span>
+            <select name="nextStageId" id="next-stage-select" required>
+              <option value="">请选择已确认的下一环节</option>
+            </select>
+            <small>只记录已经确定的安排，未经历的环节不会加入流程。</small>
+          </label>
           <label class="form-field"><span>完成时间</span><input name="completedAt" type="datetime-local" /></label>
           <label class="form-field"><span>本阶段记录</span><textarea name="note" rows="4" maxlength="800" placeholder="例如：测评已提交；面试官关注了项目难点…"></textarea></label>
           <label class="form-field" id="next-follow-up-field"><span>下次跟进</span><input name="nextFollowUp" type="date" /></label>
         </div>
         <footer class="modal-footer progress-footer">
-          <button class="button button-ghost is-danger-text" type="button" id="skip-stage-button">跳过此环节</button>
           <div>
             <button class="button button-ghost" type="button" data-close-dialog="progress-dialog">取消</button>
-            <button class="button button-primary" type="submit"><svg class="icon"><use href="#icon-arrow"></use></svg><span id="complete-stage-label">完成并进入下一步</span></button>
+            <button class="button button-primary" type="submit"><svg class="icon"><use href="#icon-arrow"></use></svg><span id="complete-stage-label">保存并进入下一环节</span></button>
           </div>
         </footer>
       </form>

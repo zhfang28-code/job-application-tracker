@@ -743,15 +743,14 @@ dialog::backdrop {
 .form-field input::placeholder,
 .form-field textarea::placeholder { color: var(--text-faint); }
 
-.pipeline-selector { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.stage-check { position: relative; cursor: pointer; }
-.stage-check input { position: absolute; opacity: 0; pointer-events: none; }
-.stage-check span { display: flex; min-height: 42px; align-items: center; gap: 7px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); color: var(--text-soft); font-size: 10px; transition: 0.17s ease; }
-.stage-check i { display: grid; width: 17px; height: 17px; place-items: center; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: transparent; font-style: normal; }
-.stage-check i::after { content: "✓"; font-size: 10px; font-weight: 800; }
-.stage-check input:checked + span { border-color: color-mix(in srgb, var(--stage-color) 36%, var(--line)); background: color-mix(in srgb, var(--stage-color) 8%, var(--surface)); color: var(--text); }
-.stage-check input:checked + span i { border-color: var(--stage-color); background: var(--stage-color); color: white; }
-.stage-check input:focus-visible + span { outline: 3px solid color-mix(in srgb, var(--primary) 18%, transparent); }
+.dynamic-flow-note { display: flex; gap: 13px; padding: 15px; border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--primary) 5%, var(--surface-soft)); }
+.dynamic-flow-icon { display: grid; width: 37px; height: 37px; flex: 0 0 auto; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--primary) 13%, var(--surface)); color: var(--primary); }
+.dynamic-flow-note strong { display: block; margin-top: 1px; color: var(--text); font-size: 11px; }
+.dynamic-flow-note p { max-width: 650px; margin: 5px 0 10px; color: var(--text-soft); font-size: 9px; line-height: 1.65; }
+.dynamic-flow-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dynamic-flow-preview span { padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text-soft); font-size: 8px; font-weight: 650; }
+.dynamic-flow-preview span:last-child { border-color: color-mix(in srgb, var(--primary) 28%, var(--line)); color: var(--primary); }
+.dynamic-flow-preview i { color: var(--text-faint); font-size: 9px; font-style: normal; }
 .stage-check input:disabled + span { cursor: not-allowed; opacity: 0.72; }
 
 .drawer {
@@ -842,8 +841,9 @@ dialog::backdrop {
 .progress-current small { display: block; }
 .progress-current strong { font-size: 11px; }
 .progress-current small { margin-top: 2px; color: var(--text-faint); font-size: 9px; }
+.progress-modal .form-field > small { margin-top: 5px; color: var(--text-faint); font-size: 8px; line-height: 1.5; }
 .progress-modal .form-field + .form-field { margin-top: 13px; }
-.progress-footer { justify-content: space-between; }
+.progress-footer { justify-content: flex-end; }
 .progress-footer > div { display: flex; gap: 8px; }
 
 .outcome-options { display: grid; gap: 8px; margin-bottom: 16px; }
@@ -923,7 +923,7 @@ dialog::backdrop {
   .app-footer { display: none; }
   .form-grid.two-columns { grid-template-columns: 1fr; }
   .form-field-wide { grid-column: auto; }
-  .pipeline-selector { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dynamic-flow-note { padding: 13px; }
   .modal { width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
   .modal-card { max-height: calc(100vh - 16px); border-radius: 15px; }
   .modal-header,
