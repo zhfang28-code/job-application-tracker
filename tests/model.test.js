@@ -7,6 +7,7 @@ import {
   applicationProgress,
   completeCurrentStage,
   createApplication,
+  inferCompanyFromUrl,
   isFollowUpDue,
   mergeApplications,
   moveToStage,
@@ -25,7 +26,6 @@ function sample(overrides = {}) {
     company: "星河科技",
     position: "前端工程师",
     city: "上海",
-    source: "官网",
     appliedAt: "2026-08-28",
     pipeline: DEFAULT_PIPELINE,
     ...overrides,
@@ -51,6 +51,25 @@ test("新建投递无需预先知道招聘流程", () => {
 
   assert.deepEqual(application.pipeline, INITIAL_PIPELINE);
   assert.equal(application.currentStageId, "applied");
+});
+
+test("岗位链接可以从参数、企业官网和 ATS 路径识别公司", () => {
+  assert.deepEqual(
+    inferCompanyFromUrl("https://jobs.example.com/position/42?companyName=%E6%98%9F%E6%B2%B3%E7%A7%91%E6%8A%80"),
+    { company: "星河科技", confidence: "high", method: "parameter" },
+  );
+  assert.deepEqual(
+    inferCompanyFromUrl("https://jobs.bytedance.com/campus/position/123"),
+    { company: "字节跳动", confidence: "high", method: "official-domain" },
+  );
+  assert.deepEqual(
+    inferCompanyFromUrl("https://jobs.lever.co/openai/abc123"),
+    { company: "OpenAI", confidence: "medium", method: "ats-path" },
+  );
+  assert.deepEqual(
+    inferCompanyFromUrl("https://www.zhipin.com/job_detail/abc.html"),
+    { company: "", confidence: "none", method: "" },
+  );
 });
 
 test("收到通知后按公司的真实顺序动态补充环节", () => {
@@ -194,10 +213,17 @@ test("损坏的导入结构会给出明确错误", () => {
 });
 
 test("旧数据缺字段时可以安全规范化", () => {
-  const normalized = normalizeApplication({ company: "旧公司", position: "旧岗位" });
+  const normalized = normalizeApplication({
+    company: "旧公司",
+    position: "旧岗位",
+    source: "官网",
+    contact: "旧联系人",
+  });
 
   assert.equal(normalized.company, "旧公司");
   assert.equal(normalized.status, "active");
   assert.deepEqual(normalized.pipeline, DEFAULT_PIPELINE);
   assert.ok(Array.isArray(normalized.timeline));
+  assert.equal("source" in normalized, false);
+  assert.equal("contact" in normalized, false);
 });

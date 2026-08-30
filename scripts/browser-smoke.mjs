@@ -122,18 +122,21 @@ try {
 
   await evaluate(client, `(() => {
     const form = document.querySelector('#application-form');
-    form.elements.company.value = '星河科技';
+    if (form.elements.source || form.elements.contact) throw new Error('Removed fields are still present');
     form.elements.position.value = '前端开发工程师';
     form.elements.city.value = '上海';
     form.elements.salary.value = '25k–35k · 14薪';
-    form.elements.source.value = '官网';
-    form.elements.jobUrl.value = 'https://example.com/jobs/frontend';
+    form.elements.jobUrl.value = 'https://jobs.example.com/frontend?companyName=%E6%98%9F%E6%B2%B3%E7%A7%91%E6%8A%80';
+    document.querySelector('#analyze-job-link-button').click();
+    if (form.elements.company.value !== '星河科技') throw new Error('Company inference failed');
     form.elements.nextFollowUp.value = '2026-08-30';
     form.elements.tags.value = '重点，内推';
     form.elements.notes.value = '重点准备 React 性能优化与项目难点。';
-    form.requestSubmit();
     return true;
   })()`);
+  await sleep(250);
+  await saveScreenshot(client, "company-inference-desktop.png");
+  await evaluate(client, "document.querySelector('#application-form').requestSubmit(); true");
   await waitFor(client, "document.querySelector('#stat-total')?.textContent === '1'");
   if (await evaluate(client, "document.querySelectorAll('.application-card').length") !== 1) {
     console.error(await evaluate(client, `JSON.stringify({
@@ -181,6 +184,10 @@ try {
   });
   await sleep(250);
   await saveScreenshot(client, "filled-mobile.png");
+  await evaluate(client, "document.querySelector('#add-application-button').click(); true");
+  await waitFor(client, "document.querySelector('#application-dialog').open");
+  await sleep(250);
+  await saveScreenshot(client, "new-application-mobile.png");
   assert.deepEqual(client.browserExceptions, []);
 
   console.log("Browser smoke test passed: create → choose actual next stage → timeline → responsive render");

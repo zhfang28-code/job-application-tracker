@@ -742,6 +742,15 @@ dialog::backdrop {
 .form-field select:focus { border-color: color-mix(in srgb, var(--primary) 58%, var(--line)); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent); }
 .form-field input::placeholder,
 .form-field textarea::placeholder { color: var(--text-faint); }
+.field-control-row { display: flex; align-items: stretch; gap: 8px; }
+.field-control-row input { min-width: 0; flex: 1; }
+.field-inline-button { display: inline-flex; min-width: 104px; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line)); border-radius: 9px; background: var(--primary-soft); color: var(--primary); font-size: 10px; font-weight: 700; cursor: pointer; transition: 0.17s ease; }
+.field-inline-button:hover { border-color: color-mix(in srgb, var(--primary) 52%, var(--line)); background: color-mix(in srgb, var(--primary) 13%, var(--surface)); }
+.field-inline-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 18%, transparent); outline-offset: 1px; }
+.field-inline-button .icon { width: 14px; height: 14px; }
+.field-hint { color: var(--text-faint); font-size: 8px; font-weight: 500; line-height: 1.5; }
+.field-hint.is-success { color: var(--green); }
+.field-hint.is-warning { color: var(--orange); }
 
 .dynamic-flow-note { display: flex; gap: 13px; padding: 15px; border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--primary) 5%, var(--surface-soft)); }
 .dynamic-flow-icon { display: grid; width: 37px; height: 37px; flex: 0 0 auto; place-items: center; border-radius: 11px; background: color-mix(in srgb, var(--primary) 13%, var(--surface)); color: var(--primary); }
@@ -751,8 +760,6 @@ dialog::backdrop {
 .dynamic-flow-preview span { padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text-soft); font-size: 8px; font-weight: 650; }
 .dynamic-flow-preview span:last-child { border-color: color-mix(in srgb, var(--primary) 28%, var(--line)); color: var(--primary); }
 .dynamic-flow-preview i { color: var(--text-faint); font-size: 9px; font-style: normal; }
-.stage-check input:disabled + span { cursor: not-allowed; opacity: 0.72; }
-
 .drawer {
   width: min(530px, 100vw);
   max-width: none;
@@ -923,6 +930,8 @@ dialog::backdrop {
   .app-footer { display: none; }
   .form-grid.two-columns { grid-template-columns: 1fr; }
   .form-field-wide { grid-column: auto; }
+  .field-control-row { align-items: stretch; flex-direction: column; }
+  .field-inline-button { min-height: 38px; }
   .dynamic-flow-note { padding: 13px; }
   .modal { width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
   .modal-card { max-height: calc(100vh - 16px); border-radius: 15px; }

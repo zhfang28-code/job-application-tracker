@@ -229,15 +229,20 @@
           <div class="form-section">
             <div class="form-section-title"><span>01</span><div><h3>岗位信息</h3><p>带 * 为必填项</p></div></div>
             <div class="form-grid two-columns">
-              <label class="form-field"><span>公司名称 *</span><input name="company" required maxlength="80" placeholder="例如：星河科技" /></label>
+              <div class="form-field form-field-wide">
+                <label for="job-url-input">岗位链接</label>
+                <div class="field-control-row">
+                  <input id="job-url-input" name="jobUrl" type="url" placeholder="https://…" aria-describedby="job-link-analysis-status" />
+                  <button class="field-inline-button" type="button" id="analyze-job-link-button"><svg class="icon"><use href="#icon-sparkle"></use></svg>识别公司</button>
+                </div>
+                <small class="field-hint" id="job-link-analysis-status" aria-live="polite">支持企业招聘官网及链接中包含公司信息的页面；只在本地分析。</small>
+              </div>
+              <label class="form-field"><span>公司名称 *</span><input name="company" required maxlength="80" autocomplete="organization" placeholder="粘贴链接自动识别，或手动输入" /></label>
               <label class="form-field"><span>岗位名称 *</span><input name="position" required maxlength="100" placeholder="例如：前端开发工程师" /></label>
               <label class="form-field"><span>城市</span><input name="city" maxlength="40" placeholder="例如：上海 / 远程" /></label>
               <label class="form-field"><span>薪资范围</span><input name="salary" maxlength="40" placeholder="例如：25k–35k · 14薪" /></label>
-              <label class="form-field"><span>投递渠道</span><input name="source" list="source-options" maxlength="40" placeholder="请选择或自行填写" /></label>
               <label class="form-field"><span>投递日期</span><input name="appliedAt" type="date" /></label>
-              <label class="form-field form-field-wide"><span>岗位链接</span><input name="jobUrl" type="url" placeholder="https://…" /></label>
               <label class="form-field"><span>下次跟进</span><input name="nextFollowUp" type="date" /></label>
-              <label class="form-field"><span>联系人</span><input name="contact" maxlength="80" placeholder="姓名 / 邮箱 / 微信" /></label>
               <label class="form-field form-field-wide"><span>标签</span><input name="tags" maxlength="160" placeholder="用逗号分隔，例如：重点，内推，远程" /></label>
             </div>
           </div>
@@ -329,11 +334,6 @@
       </form>
     </dialog>
 
-    <datalist id="source-options">
-      <option value="官网"></option><option value="Boss 直聘"></option><option value="猎聘"></option>
-      <option value="LinkedIn"></option><option value="实习僧"></option><option value="牛客"></option>
-      <option value="内推"></option><option value="校园招聘"></option><option value="其他"></option>
-    </datalist>
     <input type="file" id="import-file" accept="application/json,.json" hidden />
     <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
 

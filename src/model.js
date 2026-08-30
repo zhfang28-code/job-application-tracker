@@ -23,19 +23,87 @@ export const INTERVIEW_STAGE_IDS = new Set([
   "hr-interview",
 ]);
 
-export const SOURCE_OPTIONS = [
-  "官网",
-  "Boss 直聘",
-  "猎聘",
-  "LinkedIn",
-  "实习僧",
-  "牛客",
-  "内推",
-  "校园招聘",
-  "其他",
-];
-
 const TERMINAL_STATUSES = new Set(["offer", "rejected", "withdrawn"]);
+const COMPANY_QUERY_KEYS = new Set([
+  "company",
+  "companyname",
+  "corp",
+  "corpname",
+  "employer",
+  "employername",
+  "organization",
+  "organisation",
+]);
+const COMPANY_ALIASES = new Map([
+  ["alibaba", "阿里巴巴"],
+  ["ant group", "蚂蚁集团"],
+  ["antgroup", "蚂蚁集团"],
+  ["apple", "Apple"],
+  ["baidu", "百度"],
+  ["bilibili", "哔哩哔哩"],
+  ["byte dance", "字节跳动"],
+  ["bytedance", "字节跳动"],
+  ["ctrip", "携程"],
+  ["didi", "滴滴"],
+  ["google", "Google"],
+  ["huawei", "华为"],
+  ["jd", "京东"],
+  ["jingdong", "京东"],
+  ["kuaishou", "快手"],
+  ["meituan", "美团"],
+  ["meta", "Meta"],
+  ["microsoft", "Microsoft"],
+  ["mihoyo", "米哈游"],
+  ["netease", "网易"],
+  ["nvidia", "NVIDIA"],
+  ["openai", "OpenAI"],
+  ["pdd", "拼多多"],
+  ["pinduoduo", "拼多多"],
+  ["tencent", "腾讯"],
+  ["trip", "携程"],
+  ["xiaomi", "小米"],
+]);
+const COMPANY_HOST_RULES = [
+  { company: "字节跳动", matches: (host) => host === "job.toutiao.com" || host === "jobs.bytedance.com" || host.endsWith(".bytedance.com") },
+  { company: "腾讯", matches: (host) => host === "join.qq.com" || host === "hr.tencent.com" || host.endsWith(".tencent.com") },
+  { company: "阿里巴巴", matches: (host) => host === "talent.alibaba.com" || host.endsWith("-talent.alibaba.com") },
+  { company: "华为", matches: (host) => host === "career.huawei.com" || host.endsWith(".career.huawei.com") },
+  { company: "百度", matches: (host) => host === "talent.baidu.com" || host === "zhaopin.baidu.com" },
+  { company: "美团", matches: (host) => host === "zhaopin.meituan.com" || host === "campus.meituan.com" },
+  { company: "京东", matches: (host) => host === "zhaopin.jd.com" || host === "campus.jd.com" },
+  { company: "小米", matches: (host) => host === "hr.xiaomi.com" || host === "career.xiaomi.com" },
+  { company: "拼多多", matches: (host) => host === "career.pinduoduo.com" || host === "career.pddglobal.com" },
+  { company: "快手", matches: (host) => host === "zhaopin.kuaishou.cn" || host === "career.kuaishou.cn" },
+];
+const RECRUITMENT_SUBDOMAINS = new Set([
+  "career",
+  "careers",
+  "campus",
+  "hr",
+  "job",
+  "jobs",
+  "join",
+  "recruit",
+  "recruiting",
+  "recruitment",
+  "talent",
+  "zhaopin",
+]);
+const GENERIC_COMPANY_SLUGS = new Set([
+  "apply",
+  "campus",
+  "campus recruitment",
+  "career",
+  "careers",
+  "company",
+  "job",
+  "jobs",
+  "position",
+  "recruit",
+  "recruitment",
+  "social recruitment",
+  "talent",
+]);
 
 export function makeId(prefix = "app") {
   if (globalThis.crypto?.randomUUID) {
@@ -52,6 +120,136 @@ export function toIsoDate(value = new Date()) {
 
 export function stageById(stageId) {
   return STAGES.find((stage) => stage.id === stageId) ?? STAGES[0];
+}
+
+function decodeLinkPart(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function companyFromSlug(value) {
+  const decoded = decodeLinkPart(String(value ?? ""));
+  const normalized = decoded
+    .replace(/[+_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const aliasKey = normalized.toLocaleLowerCase("en-US");
+
+  if (
+    normalized.length < 2
+    || normalized.length > 80
+    || GENERIC_COMPANY_SLUGS.has(aliasKey)
+    || /^\d+$/.test(normalized)
+    || /^[a-f\d]{16,}$/i.test(normalized)
+    || /https?:\/\//i.test(normalized)
+  ) return "";
+
+  const alias = COMPANY_ALIASES.get(aliasKey);
+  if (alias) return alias;
+  if (/\p{Script=Han}/u.test(normalized)) return normalized;
+
+  return normalized
+    .split(" ")
+    .map((word) => word ? `${word[0].toUpperCase()}${word.slice(1)}` : "")
+    .join(" ");
+}
+
+function companyFromParameters(url) {
+  const parameterGroups = [url.searchParams];
+  const hashQueryIndex = url.hash.indexOf("?");
+  if (hashQueryIndex >= 0) {
+    parameterGroups.push(new URLSearchParams(url.hash.slice(hashQueryIndex + 1)));
+  }
+
+  for (const parameters of parameterGroups) {
+    for (const [key, value] of parameters) {
+      const normalizedKey = key.toLocaleLowerCase("en-US").replace(/[-_]/g, "");
+      if (!COMPANY_QUERY_KEYS.has(normalizedKey)) continue;
+      const company = companyFromSlug(value);
+      if (company) return company;
+    }
+  }
+  return "";
+}
+
+function companyFromAtsPath(url) {
+  const host = url.hostname.toLocaleLowerCase("en-US").replace(/^www\./, "");
+  const segments = url.pathname.split("/").filter(Boolean);
+  const firstSegmentHosts = new Set([
+    "apply.workable.com",
+    "boards.greenhouse.io",
+    "careers.smartrecruiters.com",
+    "job-boards.greenhouse.io",
+    "jobs.ashbyhq.com",
+    "jobs.lever.co",
+  ]);
+
+  if (firstSegmentHosts.has(host)) return companyFromSlug(segments[0]);
+  if (host === "app.mokahr.com") {
+    const recruitmentIndex = segments.findIndex((segment) => /recruitment$/i.test(segment));
+    return companyFromSlug(segments[recruitmentIndex + 1]);
+  }
+  const feishuMatch = host.match(/^([a-z\d-]+)\.jobs\.feishu\.cn$/i);
+  return feishuMatch ? companyFromSlug(feishuMatch[1]) : "";
+}
+
+function registrableBrandLabel(host) {
+  const labels = host.split(".").filter(Boolean);
+  if (labels.length < 3 || !RECRUITMENT_SUBDOMAINS.has(labels[0])) return "";
+  const pairedSuffix = `${labels.at(-2)}.${labels.at(-1)}`;
+  const multiPartSuffixes = new Set(["co.jp", "co.uk", "com.au", "com.cn", "net.cn", "org.cn"]);
+  return multiPartSuffixes.has(pairedSuffix) ? labels.at(-3) : labels.at(-2);
+}
+
+export function inferCompanyFromUrl(value) {
+  const rawValue = cleanText(value);
+  if (!rawValue) return { company: "", confidence: "none", method: "" };
+
+  let url;
+  try {
+    url = new URL(/^https?:\/\//i.test(rawValue) ? rawValue : `https://${rawValue}`);
+  } catch {
+    return { company: "", confidence: "none", method: "" };
+  }
+
+  if (!["http:", "https:"].includes(url.protocol)) {
+    return { company: "", confidence: "none", method: "" };
+  }
+
+  const parameterCompany = companyFromParameters(url);
+  if (parameterCompany) {
+    return { company: parameterCompany, confidence: "high", method: "parameter" };
+  }
+
+  const host = url.hostname.toLocaleLowerCase("en-US").replace(/^www\./, "");
+  const hostRule = COMPANY_HOST_RULES.find((rule) => rule.matches(host));
+  if (hostRule) {
+    return { company: hostRule.company, confidence: "high", method: "official-domain" };
+  }
+
+  const atsCompany = companyFromAtsPath(url);
+  if (atsCompany) {
+    return { company: atsCompany, confidence: "medium", method: "ats-path" };
+  }
+
+  const linkedInSlug = decodeLinkPart(url.pathname.split("/").filter(Boolean).at(-1) ?? "");
+  const linkedInMatch = host.endsWith("linkedin.com")
+    ? linkedInSlug.match(/-at-(.+?)-\d+(?:-[a-z\d]+)?$/i)
+    : null;
+  const linkedInCompany = companyFromSlug(linkedInMatch?.[1]);
+  if (linkedInCompany) {
+    return { company: linkedInCompany, confidence: "medium", method: "path" };
+  }
+
+  const domainCompany = companyFromSlug(registrableBrandLabel(host));
+  if (domainCompany) {
+    return { company: domainCompany, confidence: "medium", method: "recruitment-domain" };
+  }
+
+  return { company: "", confidence: "none", method: "" };
 }
 
 export function normalizePipeline(pipeline = DEFAULT_PIPELINE) {
@@ -86,9 +284,7 @@ export function createApplication(input = {}, now = new Date()) {
     position: cleanText(input.position),
     city: cleanText(input.city),
     jobUrl: cleanText(input.jobUrl),
-    source: cleanText(input.source),
     salary: cleanText(input.salary),
-    contact: cleanText(input.contact),
     notes: cleanText(input.notes),
     tags: Array.isArray(input.tags)
       ? input.tags.map((tag) => cleanText(tag)).filter(Boolean)
@@ -145,9 +341,7 @@ export function normalizeApplication(raw) {
     position: cleanText(raw?.position, "未命名岗位"),
     city: cleanText(raw?.city),
     jobUrl: cleanText(raw?.jobUrl),
-    source: cleanText(raw?.source),
     salary: cleanText(raw?.salary),
-    contact: cleanText(raw?.contact),
     notes: cleanText(raw?.notes),
     tags: Array.isArray(raw?.tags) ? raw.tags.map((tag) => cleanText(tag)).filter(Boolean) : [],
     appliedAt: toIsoDate(raw?.appliedAt ?? timestamp),
@@ -182,9 +376,7 @@ export function updateApplication(application, input, now = new Date()) {
     position: cleanText(input.position, original.position),
     city: cleanText(input.city),
     jobUrl: cleanText(input.jobUrl),
-    source: cleanText(input.source),
     salary: cleanText(input.salary),
-    contact: cleanText(input.contact),
     notes: cleanText(input.notes),
     tags: Array.isArray(input.tags)
       ? input.tags.map((tag) => cleanText(tag)).filter(Boolean)

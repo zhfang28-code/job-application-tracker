@@ -7,6 +7,7 @@ import {
   createApplication,
   daysSince,
   exportPayload,
+  inferCompanyFromUrl,
   isFollowUpDue,
   mergeApplications,
   moveToStage,
@@ -48,6 +49,8 @@ const elements = {
   search: $("#search-input"),
   cityFilter: $("#city-filter"),
   stageFilter: $("#stage-filter"),
+  analyzeJobLinkButton: $("#analyze-job-link-button"),
+  jobLinkAnalysisStatus: $("#job-link-analysis-status"),
   importFile: $("#import-file"),
   toastRegion: $("#toast-region"),
 };
@@ -68,6 +71,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
   minute: "2-digit",
   hour12: false,
 });
+const DEFAULT_JOB_LINK_ANALYSIS_COPY = "支持企业招聘官网及链接中包含公司信息的页面；只在本地分析。";
 
 function escapeHtml(value = "") {
   return String(value)
@@ -173,6 +177,46 @@ function showToast(message, type = "success") {
   window.setTimeout(() => toast.remove(), 3200);
 }
 
+function setJobLinkAnalysisStatus(message = DEFAULT_JOB_LINK_ANALYSIS_COPY, state = "") {
+  elements.jobLinkAnalysisStatus.textContent = message;
+  elements.jobLinkAnalysisStatus.classList.toggle("is-success", state === "success");
+  elements.jobLinkAnalysisStatus.classList.toggle("is-warning", state === "warning");
+}
+
+function analyzeCompanyFromJobUrl({ announce = false } = {}) {
+  const jobUrlField = elements.applicationForm.elements.jobUrl;
+  const companyField = elements.applicationForm.elements.company;
+  const result = inferCompanyFromUrl(jobUrlField.value);
+
+  if (!jobUrlField.value.trim()) {
+    setJobLinkAnalysisStatus("请先粘贴岗位链接，再识别公司。", "warning");
+    return;
+  }
+  if (!result.company) {
+    setJobLinkAnalysisStatus("链接中没有可识别的公司信息，请手动填写公司名称。招聘平台链接常见这种情况。", "warning");
+    return;
+  }
+
+  const currentCompany = companyField.value.trim();
+  const previousInference = companyField.dataset.inferredCompany ?? "";
+  const canFill = !currentCompany || currentCompany === previousInference;
+  const actionLabel = result.confidence === "high" ? "识别" : "推测";
+
+  if (canFill) {
+    companyField.value = result.company;
+    companyField.dataset.inferredCompany = result.company;
+    setJobLinkAnalysisStatus(`已从链接${actionLabel}为“${result.company}”，请确认名称是否正确。`, "success");
+    if (announce) showToast(`已${actionLabel}公司：${result.company}`);
+    return;
+  }
+
+  if (currentCompany === result.company) {
+    setJobLinkAnalysisStatus(`当前公司名称与链接${actionLabel}结果一致。`, "success");
+  } else {
+    setJobLinkAnalysisStatus(`链接${actionLabel}为“${result.company}”；已保留你填写的“${currentCompany}”。`, "warning");
+  }
+}
+
 function formValue(form, name) {
   return new FormData(form).get(name)?.toString() ?? "";
 }
@@ -183,11 +227,9 @@ function applicationFormPayload(form) {
     position: formValue(form, "position"),
     city: formValue(form, "city"),
     salary: formValue(form, "salary"),
-    source: formValue(form, "source"),
     appliedAt: formValue(form, "appliedAt"),
     jobUrl: formValue(form, "jobUrl"),
     nextFollowUp: formValue(form, "nextFollowUp"),
-    contact: formValue(form, "contact"),
     tags: formValue(form, "tags"),
     notes: formValue(form, "notes"),
   };
@@ -198,6 +240,8 @@ function openApplicationForm(application = null) {
   const title = $("#application-dialog-title");
   const submitLabel = $("#save-application-button");
   const idField = elements.applicationForm.elements.applicationId;
+  delete elements.applicationForm.elements.company.dataset.inferredCompany;
+  setJobLinkAnalysisStatus();
 
   if (!application) {
     title.textContent = "新建投递";
@@ -208,7 +252,7 @@ function openApplicationForm(application = null) {
     title.textContent = "编辑投递";
     submitLabel.lastChild.textContent = "保存修改";
     idField.value = application.id;
-    for (const name of ["company", "position", "city", "salary", "source", "jobUrl", "nextFollowUp", "contact", "notes"]) {
+    for (const name of ["company", "position", "city", "salary", "jobUrl", "nextFollowUp", "notes"]) {
       elements.applicationForm.elements[name].value = application[name] ?? "";
     }
     elements.applicationForm.elements.appliedAt.value = formatDateInput(application.appliedAt);
@@ -226,7 +270,6 @@ function getFilteredApplications() {
         application.company,
         application.position,
         application.city,
-        application.source,
         application.salary,
         application.tags.join(" "),
         application.notes,
@@ -472,7 +515,6 @@ function renderDetail(applicationId) {
         ${application.city ? `<span>${icon("pin")}${escapeHtml(application.city)}</span>` : ""}
         <span>${icon("calendar")}投递于 ${formatDate(application.appliedAt, fullDateFormatter)}</span>
         ${application.salary ? `<span>${escapeHtml(application.salary)}</span>` : ""}
-        ${application.source ? `<span>来自 ${escapeHtml(application.source)}</span>` : ""}
         ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${icon("link")}打开岗位链接</a>` : ""}
       </div>
       ${application.tags.length ? `<div class="detail-tags">${application.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
@@ -497,7 +539,7 @@ function renderDetail(applicationId) {
     </section>
 
     <section class="detail-section">
-      <div class="detail-section-header"><h3>岗位与准备备注</h3>${application.contact ? `<small>联系人：${escapeHtml(application.contact)}</small>` : ""}</div>
+      <div class="detail-section-header"><h3>岗位与准备备注</h3></div>
       <p class="detail-notes${application.notes ? "" : " is-empty"}">${escapeHtml(application.notes || "还没有备注，点击编辑补充 JD 重点或面试准备事项。")}</p>
     </section>
 
@@ -583,7 +625,7 @@ function safeCsvCell(value) {
 }
 
 function exportCsv() {
-  const headers = ["公司", "岗位", "城市", "当前进度", "状态", "投递日期", "下次跟进", "薪资", "渠道", "岗位链接", "标签", "备注"];
+  const headers = ["公司", "岗位", "城市", "当前进度", "状态", "投递日期", "下次跟进", "薪资", "岗位链接", "标签", "备注"];
   const rows = applications.map((application) => [
     application.company,
     application.position,
@@ -593,7 +635,6 @@ function exportCsv() {
     formatDateInput(application.appliedAt),
     application.nextFollowUp,
     application.salary,
-    application.source,
     application.jobUrl,
     application.tags.join("；"),
     application.notes,
@@ -618,6 +659,18 @@ function initializeTheme() {
 function setupEventListeners() {
   $("#add-application-button").addEventListener("click", () => openApplicationForm());
   $("#empty-action").addEventListener("click", () => applications.length ? resetFilters() : openApplicationForm());
+  elements.analyzeJobLinkButton.addEventListener("click", () => analyzeCompanyFromJobUrl({ announce: true }));
+  elements.applicationForm.elements.jobUrl.addEventListener("change", () => analyzeCompanyFromJobUrl());
+  elements.applicationForm.elements.jobUrl.addEventListener("input", () => setJobLinkAnalysisStatus());
+  elements.applicationForm.elements.jobUrl.addEventListener("paste", () => {
+    window.setTimeout(() => analyzeCompanyFromJobUrl(), 0);
+  });
+  elements.applicationForm.elements.company.addEventListener("input", () => {
+    const field = elements.applicationForm.elements.company;
+    if (field.dataset.inferredCompany && field.value.trim() !== field.dataset.inferredCompany) {
+      delete field.dataset.inferredCompany;
+    }
+  });
 
   $$('[data-close-dialog]').forEach((button) => {
     button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog)?.close());
