@@ -35,6 +35,17 @@ let filters = {
   quick: "all",
 };
 
+const QUICK_FILTERS = new Set(["all", "active", "due", "interviewing", "offer", "closed"]);
+const QUICK_FILTER_TITLES = Object.freeze({
+  all: "投递流程",
+  active: "进行中的投递",
+  due: "待跟进的投递",
+  interviewing: "面试阶段",
+  offer: "收到 Offer",
+  closed: "已结束的投递",
+});
+const CLOSED_COLUMN = Object.freeze({ id: "closed", label: "已结束", color: "#dc5264" });
+
 const elements = {
   board: $("#pipeline-board"),
   list: $("#list-view"),
@@ -147,6 +158,53 @@ function outcomeColumn(application) {
   return ["rejected", "withdrawn"].includes(application.status)
     ? "closed"
     : application.currentStageId;
+}
+
+function baseBoardColumns(quickFilter = filters.quick) {
+  if (quickFilter === "interviewing") {
+    return STAGES.filter((stage) => INTERVIEW_STAGE_IDS.has(stage.id));
+  }
+  if (quickFilter === "offer") return STAGES.filter((stage) => stage.id === "offer");
+  if (quickFilter === "closed") return [CLOSED_COLUMN];
+  if (["active", "due"].includes(quickFilter)) {
+    return STAGES.filter((stage) => stage.id !== "offer");
+  }
+  return [...STAGES, CLOSED_COLUMN];
+}
+
+function currentBoardColumns() {
+  const columns = baseBoardColumns();
+  return filters.stage === "all"
+    ? columns
+    : columns.filter((column) => column.id === filters.stage);
+}
+
+function updateQuickFilterControls() {
+  $$('[data-quick-filter]').forEach((button) => {
+    const isActive = button.dataset.quickFilter === filters.quick;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+  $$('[data-summary-filter]').forEach((button) => {
+    const isSelected = button.dataset.summaryFilter === filters.quick;
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+  });
+}
+
+function applyQuickFilter(quickFilter, { scroll = true } = {}) {
+  if (!QUICK_FILTERS.has(quickFilter)) return;
+  filters.quick = quickFilter;
+
+  const availableColumns = new Set(baseBoardColumns(quickFilter).map((column) => column.id));
+  if (filters.stage !== "all" && !availableColumns.has(filters.stage)) {
+    filters.stage = "all";
+    elements.stageFilter.value = "all";
+  }
+
+  updateQuickFilterControls();
+  renderWorkspace();
+  if (scroll) $("#pipeline-heading").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function companyInitial(company) {
@@ -299,6 +357,7 @@ function getFilteredApplications() {
     if (filters.city !== "all" && application.city !== filters.city) return false;
     if (filters.stage !== "all" && outcomeColumn(application) !== filters.stage) return false;
 
+    if (filters.quick === "active" && !["active", "paused"].includes(application.status)) return false;
     if (filters.quick === "due" && !isFollowUpDue(application)) return false;
     if (filters.quick === "interviewing" && !(application.status === "active" && INTERVIEW_STAGE_IDS.has(application.currentStageId))) return false;
     if (filters.quick === "offer" && application.status !== "offer") return false;
@@ -352,10 +411,7 @@ function cardHtml(application) {
 }
 
 function renderBoard(items) {
-  const columns = [
-    ...STAGES.map((stage) => ({ ...stage, id: stage.id })),
-    { id: "closed", label: "已结束", color: "#dc5264" },
-  ];
+  const columns = currentBoardColumns();
 
   elements.board.innerHTML = columns.map((column) => {
     const cards = items.filter((application) => outcomeColumn(application) === column.id);
@@ -449,6 +505,7 @@ function renderFollowUps() {
 
 function renderWorkspace() {
   const items = getFilteredApplications();
+  $("#pipeline-heading").textContent = QUICK_FILTER_TITLES[filters.quick] ?? QUICK_FILTER_TITLES.all;
   $("#visible-count").textContent = `${items.length} 个机会`;
   elements.board.classList.toggle("is-hidden", view !== "board" || items.length === 0);
   elements.list.classList.toggle("is-hidden", view !== "list" || items.length === 0);
@@ -458,6 +515,8 @@ function renderWorkspace() {
     renderBoard(items);
     renderList(items);
   } else {
+    elements.board.replaceChildren();
+    elements.list.replaceChildren();
     const hasAny = applications.length > 0;
     $("#empty-title").textContent = hasAny ? "没有符合条件的记录" : "还没有投递记录";
     $("#empty-copy").textContent = hasAny ? "换个关键词或清除筛选条件再试试。" : "添加第一份投递，从此不再遗漏任何进展。";
@@ -475,6 +534,7 @@ function renderAll() {
   renderSummary();
   renderFilters();
   renderFollowUps();
+  updateQuickFilterControls();
   renderWorkspace();
   if (activeDetailId && elements.detailDialog.open) renderDetail(activeDetailId);
 }
@@ -620,7 +680,6 @@ function updateApplicationInState(updated) {
 function resetFilters() {
   filters = { search: "", city: "all", stage: "all", quick: "all" };
   elements.search.value = "";
-  $$("[data-quick-filter]").forEach((button) => button.classList.toggle("is-active", button.dataset.quickFilter === "all"));
   renderAll();
 }
 
@@ -856,10 +915,11 @@ function setupEventListeners() {
   }));
 
   $$('[data-quick-filter]').forEach((button) => button.addEventListener("click", () => {
-    filters.quick = button.dataset.quickFilter;
-    $$('[data-quick-filter]').forEach((item) => item.classList.toggle("is-active", item === button));
-    renderWorkspace();
-    $("#pipeline-heading").scrollIntoView({ behavior: "smooth", block: "start" });
+    applyQuickFilter(button.dataset.quickFilter);
+  }));
+
+  $$('[data-summary-filter]').forEach((button) => button.addEventListener("click", () => {
+    applyQuickFilter(button.dataset.summaryFilter);
   }));
 
   $("#theme-toggle").addEventListener("click", () => {

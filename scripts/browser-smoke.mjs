@@ -196,6 +196,72 @@ try {
   })()`);
   assert.deepEqual(csvImported, { currentStageId: "assessment", email: "jobs@example.com", source: "csv" });
 
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"interviewing\"]').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelectorAll('.application-card').length === 1");
+  const interviewFilter = await evaluate(client, `(() => ({
+    companies: [...document.querySelectorAll('.application-card .card-title h4')].map((item) => item.textContent),
+    columns: [...document.querySelectorAll('.board-column')].map((item) => item.dataset.stageTarget),
+    selected: document.querySelector('[data-summary-filter="interviewing"]').classList.contains('is-selected'),
+    selectedCount: document.querySelectorAll('[data-summary-filter].is-selected').length,
+    pressed: document.querySelector('[data-summary-filter="interviewing"]').getAttribute('aria-pressed'),
+    sidebarSynced: document.querySelector('[data-quick-filter="interviewing"]').classList.contains('is-active'),
+  }))()`);
+  assert.deepEqual(interviewFilter, {
+    companies: ["星河科技"],
+    columns: ["ai-interview", "first-interview", "second-interview", "final-interview", "hr-interview"],
+    selected: true,
+    selectedCount: 1,
+    pressed: "true",
+    sidebarSynced: true,
+  });
+  await saveScreenshot(client, "summary-filter-interviewing-desktop.png");
+
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"active\"]').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '2 个机会' && document.querySelectorAll('.application-card').length === 2");
+  assert.deepEqual(
+    await evaluate(client, "[...document.querySelectorAll('.board-column')].map((item) => item.dataset.stageTarget)"),
+    ["applied", "assessment", "ai-interview", "first-interview", "second-interview", "final-interview", "hr-interview"],
+  );
+
+  await evaluate(client, `(() => {
+    const card = [...document.querySelectorAll('.application-card')]
+      .find((item) => item.textContent.includes('星河科技'));
+    card.querySelector('[data-action="progress"]').click();
+    return true;
+  })()`);
+  await waitFor(client, "document.querySelector('#progress-dialog').open");
+  await evaluate(client, `(() => {
+    const form = document.querySelector('#progress-form');
+    form.elements.nextStageId.value = 'offer';
+    form.elements.note.value = '已收到正式 Offer';
+    form.requestSubmit();
+    return true;
+  })()`);
+  await waitFor(client, "!document.querySelector('#progress-dialog').open && document.querySelector('#stat-offers')?.textContent === '1'");
+
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"offer\"]').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelectorAll('.application-card').length === 1");
+  const offerFilter = await evaluate(client, `(() => ({
+    company: document.querySelector('.application-card .card-title h4')?.textContent,
+    columns: [...document.querySelectorAll('.board-column')].map((item) => item.dataset.stageTarget),
+    selected: document.querySelector('[data-summary-filter="offer"]').classList.contains('is-selected'),
+    selectedCount: document.querySelectorAll('[data-summary-filter].is-selected').length,
+    sidebarSynced: document.querySelector('[data-quick-filter="offer"]').classList.contains('is-active'),
+  }))()`);
+  assert.deepEqual(offerFilter, {
+    company: "星河科技",
+    columns: ["offer"],
+    selected: true,
+    selectedCount: 1,
+    sidebarSynced: true,
+  });
+  await saveScreenshot(client, "summary-filter-offer-desktop.png");
+
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"all\"]').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '2 个机会' && document.querySelectorAll('.application-card').length === 2");
+  assert.equal(await evaluate(client, "document.querySelectorAll('.board-column').length"), 9);
+  assert.equal(await evaluate(client, "document.querySelector('[data-quick-filter=\"all\"]').classList.contains('is-active')"), true);
+
   await saveScreenshot(client, "filled-desktop.png");
   await client.send("Emulation.setDeviceMetricsOverride", {
     width: 390,
@@ -211,7 +277,7 @@ try {
   await saveScreenshot(client, "new-application-mobile.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: create → progress → CSV import → timeline → responsive render");
+  console.log("Browser smoke test passed: create → progress → CSV import → summary filters → responsive render");
 } finally {
   client.close();
 }

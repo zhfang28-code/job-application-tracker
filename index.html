@@ -139,23 +139,23 @@
             </div>
           </div>
 
-          <div class="stats-grid">
-            <article class="stat-card stat-total">
+          <div class="stats-grid" role="group" aria-label="投递概览筛选">
+            <button class="stat-card stat-total is-selected" type="button" data-summary-filter="all" aria-pressed="true" aria-controls="pipeline-board">
               <div class="stat-icon"><svg class="icon"><use href="#icon-building"></use></svg></div>
               <div><span>全部投递</span><strong id="stat-total">0</strong><small id="stat-total-copy">开始记录第一份机会</small></div>
-            </article>
-            <article class="stat-card stat-active">
+            </button>
+            <button class="stat-card stat-active" type="button" data-summary-filter="active" aria-pressed="false" aria-controls="pipeline-board">
               <div class="stat-icon"><svg class="icon"><use href="#icon-arrow"></use></svg></div>
               <div><span>进行中</span><strong id="stat-active">0</strong><small>正在推进的流程</small></div>
-            </article>
-            <article class="stat-card stat-interview">
+            </button>
+            <button class="stat-card stat-interview" type="button" data-summary-filter="interviewing" aria-pressed="false" aria-controls="pipeline-board">
               <div class="stat-icon"><svg class="icon"><use href="#icon-message"></use></svg></div>
               <div><span>面试阶段</span><strong id="stat-interviewing">0</strong><small>AI 面试及后续环节</small></div>
-            </article>
-            <article class="stat-card stat-offer">
+            </button>
+            <button class="stat-card stat-offer" type="button" data-summary-filter="offer" aria-pressed="false" aria-controls="pipeline-board">
               <div class="stat-icon"><svg class="icon"><use href="#icon-sparkle"></use></svg></div>
               <div><span>收到 Offer</span><strong id="stat-offers">0</strong><small>值得庆祝的结果</small></div>
-            </article>
+            </button>
           </div>
         </section>
 
