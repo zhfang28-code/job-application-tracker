@@ -1,14 +1,16 @@
-const CACHE_NAME = "jobtrail-static-v5";
+const RELEASE = "20260830-4";
+const CACHE_NAME = `jobtrail-static-${RELEASE}`;
+const versioned = (path) => `${path}?v=${RELEASE}`;
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css",
+  versioned("./styles.css"),
   "./icon.svg",
   "./manifest.webmanifest",
-  "./src/app.js",
-  "./src/model.js",
-  "./src/storage.js",
-  "./src/csv-import.js",
+  versioned("./src/app.js"),
+  versioned("./src/model.js"),
+  versioned("./src/storage.js"),
+  versioned("./src/csv-import.js"),
 ];
 
 self.addEventListener("install", (event) => {
@@ -27,13 +29,29 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", response.clone()));
+          }
+          return response;
+        })
+        .catch(() => caches.match("./index.html")),
+    );
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached ?? caches.match("./index.html"))),
+    caches.match(event.request).then((cached) => cached ?? fetch(event.request).then((response) => {
+      if (response.ok) {
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+      }
+      return response;
+    })),
   );
 });

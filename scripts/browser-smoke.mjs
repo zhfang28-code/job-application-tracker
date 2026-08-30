@@ -109,6 +109,15 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260830-4')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260830-4'))", 10000);
+
+  const releaseAssets = await evaluate(client, `(() => ({
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260830-4'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260830-4'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260830-4'),
+  }))()`);
+  assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
   await evaluate(client, "document.documentElement.dataset.appReady = 'reloading'; localStorage.clear(); location.reload(); true");
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true' && document.querySelector('#stat-total')?.textContent === '0'");
@@ -351,9 +360,28 @@ try {
   assert.equal(await evaluate(client, "document.querySelector('.overview-total').classList.contains('is-selected')"), true);
 
   await saveScreenshot(client, "filled-desktop.png");
+
+  await evaluate(client, `(() => {
+    const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
+    const legacy = payload.applications.find((item) => item.company === '平川机械');
+    legacy.status = 'paused';
+    legacy.nextFollowUp = '2026-09-01';
+    legacy.importSource = { ...legacy.importSource, progress: '人才库' };
+    localStorage.setItem('jobtrail.applications.v1', JSON.stringify(payload));
+    document.documentElement.dataset.appReady = 'reloading';
+    location.reload();
+    return true;
+  })()`);
+  await waitFor(client, "document.documentElement.dataset.appReady === 'true' && document.querySelector('#stat-total')?.textContent === '3' && document.querySelector('#nav-closed')?.textContent === '1'");
+  assert.equal(await evaluate(client, "document.querySelector('#stat-ongoing')?.textContent"), "0");
+  assert.equal(await evaluate(client, "document.querySelector('#stat-total-copy')?.textContent.includes('仍在推进')"), true);
+  await evaluate(client, "document.querySelector('[data-quick-filter=\"closed\"]').click(); true");
+  await waitFor(client, "document.querySelector('.application-card')?.textContent.includes('平川机械') && document.querySelector('.application-card')?.textContent.includes('未通过')");
+  assert.equal(await evaluate(client, "document.querySelector('.application-card').textContent.includes('已搁置')"), false);
+  await saveScreenshot(client, "legacy-talent-pool-migration-desktop.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: create → progress → CSV import → exclusive filters → desktop-only render");
+  console.log("Browser smoke test passed: version upgrade → exclusive filters → talent-pool migration → desktop render");
 } finally {
   client.close();
 }

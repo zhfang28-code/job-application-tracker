@@ -5,7 +5,7 @@ import {
   normalizePipeline,
   stageById,
   toIsoDate,
-} from "./model.js";
+} from "./model.js?v=20260830-4";
 
 const HEADER_ALIASES = Object.freeze({
   company: ["单位", "公司", "公司名称", "投递公司"],
@@ -147,9 +147,9 @@ export function mapCsvProgress(statusValue, assessmentValue = "") {
     ? ["assessment"]
     : [];
   let status = "active";
-  if (/拒绝|未通过|不通过|淘汰|不合适|感谢信/.test(normalizedStatus)) status = "rejected";
+  if (/人才库|拒绝|未通过|不通过|淘汰|不合适|感谢信/.test(normalizedStatus)) status = "rejected";
   else if (/撤回|放弃|终止申请|不再考虑/.test(normalizedStatus)) status = "withdrawn";
-  else if (/人才库|暂停|搁置|冻结|延期/.test(normalizedStatus)) status = "paused";
+  else if (/暂停|搁置|冻结|延期/.test(normalizedStatus)) status = "paused";
   else if (stageId === "offer") status = "offer";
   return { raw: combined, stageId, status, priorStageIds };
 }

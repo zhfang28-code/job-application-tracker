@@ -343,6 +343,7 @@ export function createApplication(input = {}, now = new Date()) {
 
 export function normalizeApplication(raw) {
   const pipeline = normalizePipeline(raw?.pipeline);
+  const importSource = normalizeImportSource(raw?.importSource);
   const timeline = Array.isArray(raw?.timeline)
     ? raw.timeline
         .filter((event) => event && STAGE_IDS.has(event.stageId))
@@ -360,9 +361,12 @@ export function normalizeApplication(raw) {
   const currentStageId = pipeline.includes(raw?.currentStageId)
     ? raw.currentStageId
     : pipeline[0];
-  const status = ["active", "paused", "offer", "rejected", "withdrawn"].includes(raw?.status)
+  const normalizedStatus = ["active", "paused", "offer", "rejected", "withdrawn"].includes(raw?.status)
     ? raw.status
     : "active";
+  const status = normalizedStatus === "paused" && /人才库/.test(importSource?.progress ?? "")
+    ? "rejected"
+    : normalizedStatus;
   const timestamp = toIsoDate(raw?.createdAt);
   const target = normalizeApplicationTarget(raw);
 
@@ -377,12 +381,12 @@ export function normalizeApplication(raw) {
     notes: cleanText(raw?.notes),
     tags: Array.isArray(raw?.tags) ? raw.tags.map((tag) => cleanText(tag)).filter(Boolean) : [],
     appliedAt: toIsoDate(raw?.appliedAt ?? timestamp),
-    nextFollowUp: cleanText(raw?.nextFollowUp),
+    nextFollowUp: TERMINAL_STATUSES.has(status) ? "" : cleanText(raw?.nextFollowUp),
     pipeline,
     currentStageId,
     status,
     timeline,
-    importSource: normalizeImportSource(raw?.importSource),
+    importSource,
     createdAt: timestamp,
     updatedAt: toIsoDate(raw?.updatedAt ?? timestamp),
   };

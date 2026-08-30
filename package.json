@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node scripts/dev-server.mjs",
     "test": "node --test",
-    "check": "node --check src/app.js && node --check src/model.js && node --check src/storage.js && node --check src/csv-import.js && node --test"
+    "check": "node --check src/app.js && node --check src/model.js && node --check src/storage.js && node --check src/csv-import.js && node --check sw.js && node --test"
   },
   "engines": {
     "node": ">=20"

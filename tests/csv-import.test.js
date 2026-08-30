@@ -54,7 +54,7 @@ test("状态与测评列会合并为当前阶段和结果", () => {
   assert.equal(mapCsvProgress("已线上测评", "AI面").stageId, "ai-interview");
   assert.equal(mapCsvProgress("已线上测评", "一面").stageId, "first-interview");
   assert.equal(mapCsvProgress("拒绝", "AI面").status, "rejected");
-  assert.equal(mapCsvProgress("人才库", "").status, "paused");
+  assert.equal(mapCsvProgress("人才库", "").status, "rejected");
   assert.equal(mapCsvProgress("需线上测评", "").stageId, "assessment");
 });
 

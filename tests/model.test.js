@@ -248,3 +248,21 @@ test("旧数据缺字段时可以安全规范化", () => {
   assert.equal("source" in normalized, false);
   assert.equal("contact" in normalized, false);
 });
+
+test("旧版 CSV 人才库记录会迁移为未通过", () => {
+  const migrated = normalizeApplication({
+    ...sample(),
+    status: "paused",
+    nextFollowUp: "2026-09-01",
+    importSource: {
+      format: "csv",
+      recordKey: "legacy-talent-pool",
+      progress: "人才库",
+      importedAt: NOW.toISOString(),
+    },
+  });
+
+  assert.equal(migrated.status, "rejected");
+  assert.equal(migrated.nextFollowUp, "");
+  assert.equal(applicationCategory(migrated), "closed");
+});

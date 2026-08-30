@@ -17,9 +17,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js";
+} from "./model.js?v=20260830-4";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260830-4";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260830-4";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -1019,10 +1019,6 @@ function initialize() {
   setupEventListeners();
   renderAll();
   document.documentElement.dataset.appReady = "true";
-
-  if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
-    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(console.warn));
-  }
 }
 
 initialize();
