@@ -171,6 +171,16 @@ try {
   await evaluate(client, "document.querySelector('.application-card').click(); true");
   await waitFor(client, "document.querySelector('#detail-dialog').open && document.querySelector('#detail-content').textContent.includes('网申已确认')");
   assert.equal(await evaluate(client, "document.querySelector('#detail-content').textContent.includes('重点准备 React')"), true);
+  const detailFontSizes = await evaluate(client, `(() => ({
+    company: Number.parseFloat(getComputedStyle(document.querySelector('.detail-company-row h2')).fontSize),
+    section: Number.parseFloat(getComputedStyle(document.querySelector('.detail-section h3')).fontSize),
+    notes: Number.parseFloat(getComputedStyle(document.querySelector('.detail-notes')).fontSize),
+    drawerWidth: document.querySelector('#detail-dialog').getBoundingClientRect().width,
+  }))()`);
+  assert.equal(detailFontSizes.company >= 30, true);
+  assert.equal(detailFontSizes.section >= 16, true);
+  assert.equal(detailFontSizes.notes >= 14, true);
+  assert.equal(detailFontSizes.drawerWidth >= 700, true);
   await sleep(3300);
   await saveScreenshot(client, "detail-desktop.png");
   await evaluate(client, "document.querySelector('[data-close-dialog=\"detail-dialog\"]').click(); true");
@@ -179,7 +189,8 @@ try {
     window.confirm = () => true;
     const csv = [
       '单位,岗位,城市|工作地,投递链接,状态,测评|笔试,简历附件',
-      '远山科技,后端工程师,北京,jobs@example.com,需线上测评,,resume.pdf'
+      '远山科技,后端工程师,北京,jobs@example.com,需线上测评,,resume.pdf',
+      '平川机械,工艺工程师,苏州,hr@pingchuan.cn,已投递,,resume.pdf'
     ].join('\\n');
     const transfer = new DataTransfer();
     transfer.items.add(new File([csv], 'applications.csv', { type: 'text/csv' }));
@@ -188,13 +199,45 @@ try {
     input.dispatchEvent(new Event('change'));
     return true;
   })()`);
-  await waitFor(client, "document.querySelector('#stat-total')?.textContent === '2' && document.body.textContent.includes('远山科技')");
+  await waitFor(client, "document.querySelector('#stat-total')?.textContent === '3' && document.body.textContent.includes('远山科技') && document.body.textContent.includes('平川机械')");
   const csvImported = await evaluate(client, `(() => {
     const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
-    const app = payload.applications.find((item) => item.company === '远山科技');
-    return { currentStageId: app.currentStageId, email: app.applicationEmail, source: app.importSource?.format };
+    const assessment = payload.applications.find((item) => item.company === '远山科技');
+    const ongoing = payload.applications.find((item) => item.company === '平川机械');
+    return {
+      assessment: { currentStageId: assessment.currentStageId, email: assessment.applicationEmail, source: assessment.importSource?.format },
+      ongoing: { currentStageId: ongoing.currentStageId, email: ongoing.applicationEmail, source: ongoing.importSource?.format },
+    };
   })()`);
-  assert.deepEqual(csvImported, { currentStageId: "assessment", email: "jobs@example.com", source: "csv" });
+  assert.deepEqual(csvImported, {
+    assessment: { currentStageId: "assessment", email: "jobs@example.com", source: "csv" },
+    ongoing: { currentStageId: "applied", email: "hr@pingchuan.cn", source: "csv" },
+  });
+
+  const mutuallyExclusiveCounts = await evaluate(client, `(() => ({
+    total: Number(document.querySelector('#stat-total').textContent),
+    ongoing: Number(document.querySelector('#stat-ongoing').textContent),
+    assessment: Number(document.querySelector('#stat-assessment').textContent),
+    interviewing: Number(document.querySelector('#stat-interviewing').textContent),
+    offers: Number(document.querySelector('#stat-offers').textContent),
+    closed: Number(document.querySelector('#nav-closed').textContent),
+  }))()`);
+  assert.deepEqual(mutuallyExclusiveCounts, {
+    total: 3,
+    ongoing: 1,
+    assessment: 1,
+    interviewing: 1,
+    offers: 0,
+    closed: 0,
+  });
+  assert.equal(
+    mutuallyExclusiveCounts.ongoing
+      + mutuallyExclusiveCounts.assessment
+      + mutuallyExclusiveCounts.interviewing
+      + mutuallyExclusiveCounts.offers
+      + mutuallyExclusiveCounts.closed,
+    mutuallyExclusiveCounts.total,
+  );
 
   await evaluate(client, "document.querySelector('[data-summary-filter=\"interviewing\"]').click(); true");
   await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelectorAll('.application-card').length === 1");
@@ -216,12 +259,32 @@ try {
   });
   await saveScreenshot(client, "summary-filter-interviewing-desktop.png");
 
-  await evaluate(client, "document.querySelector('[data-summary-filter=\"active\"]').click(); true");
-  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '2 个机会' && document.querySelectorAll('.application-card').length === 2");
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"assessment\"]').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelector('.application-card')?.textContent.includes('远山科技')");
   assert.deepEqual(
     await evaluate(client, "[...document.querySelectorAll('.board-column')].map((item) => item.dataset.stageTarget)"),
-    ["applied", "assessment", "ai-interview", "first-interview", "second-interview", "final-interview", "hr-interview"],
+    ["assessment"],
   );
+  await saveScreenshot(client, "summary-filter-assessment-desktop.png");
+
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"ongoing\"]').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelector('.application-card')?.textContent.includes('平川机械')");
+  assert.deepEqual(
+    await evaluate(client, "[...document.querySelectorAll('.board-column')].map((item) => item.dataset.stageTarget)"),
+    ["applied"],
+  );
+  const boardCardSize = await evaluate(client, `(() => ({
+    title: Number.parseFloat(getComputedStyle(document.querySelector('.card-title h4')).fontSize),
+    width: document.querySelector('.application-card').getBoundingClientRect().width,
+    minBodyWidth: getComputedStyle(document.body).minWidth,
+  }))()`);
+  assert.equal(boardCardSize.title >= 16, true);
+  assert.equal(boardCardSize.width >= 340, true);
+  assert.equal(boardCardSize.minBodyWidth, "1280px");
+  await saveScreenshot(client, "summary-filter-ongoing-desktop.png");
+
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"interviewing\"]').click(); true");
+  await waitFor(client, "document.querySelector('.application-card')?.textContent.includes('星河科技')");
 
   await evaluate(client, `(() => {
     const card = [...document.querySelectorAll('.application-card')]
@@ -257,27 +320,40 @@ try {
   });
   await saveScreenshot(client, "summary-filter-offer-desktop.png");
 
-  await evaluate(client, "document.querySelector('[data-summary-filter=\"all\"]').click(); true");
-  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '2 个机会' && document.querySelectorAll('.application-card').length === 2");
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"ongoing\"]').click(); true");
+  await waitFor(client, "document.querySelector('.application-card')?.textContent.includes('平川机械')");
+  await evaluate(client, "document.querySelector('.application-card').click(); true");
+  await waitFor(client, "document.querySelector('#detail-dialog').open && document.querySelector('#detail-content').textContent.includes('平川机械')");
+  await evaluate(client, "document.querySelector('#detail-content [data-detail-action=\"status\"]').click(); true");
+  await waitFor(client, "document.querySelector('#outcome-dialog').open");
+  await evaluate(client, `(() => {
+    const form = document.querySelector('#outcome-form');
+    form.querySelector('[name="status"][value="rejected"]').checked = true;
+    form.elements.note.value = '流程已结束';
+    form.requestSubmit();
+    return true;
+  })()`);
+  await waitFor(client, "!document.querySelector('#outcome-dialog').open && document.querySelector('#nav-closed')?.textContent === '1'");
+  await evaluate(client, "document.querySelector('[data-close-dialog=\"detail-dialog\"]').click(); true");
+  await evaluate(client, "document.querySelector('[data-quick-filter=\"closed\"]').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelector('.application-card')?.textContent.includes('平川机械')");
+  assert.deepEqual(
+    await evaluate(client, "[...document.querySelectorAll('.board-column')].map((item) => item.dataset.stageTarget)"),
+    ["closed"],
+  );
+  assert.equal(await evaluate(client, "document.querySelectorAll('[data-summary-filter].is-selected').length"), 0);
+  await saveScreenshot(client, "summary-filter-closed-desktop.png");
+
+  await evaluate(client, "document.querySelector('.overview-total').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '3 个机会' && document.querySelectorAll('.application-card').length === 3");
   assert.equal(await evaluate(client, "document.querySelectorAll('.board-column').length"), 9);
   assert.equal(await evaluate(client, "document.querySelector('[data-quick-filter=\"all\"]').classList.contains('is-active')"), true);
+  assert.equal(await evaluate(client, "document.querySelector('.overview-total').classList.contains('is-selected')"), true);
 
   await saveScreenshot(client, "filled-desktop.png");
-  await client.send("Emulation.setDeviceMetricsOverride", {
-    width: 390,
-    height: 844,
-    deviceScaleFactor: 1,
-    mobile: true,
-  });
-  await sleep(250);
-  await saveScreenshot(client, "filled-mobile.png");
-  await evaluate(client, "document.querySelector('#add-application-button').click(); true");
-  await waitFor(client, "document.querySelector('#application-dialog').open");
-  await sleep(250);
-  await saveScreenshot(client, "new-application-mobile.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: create → progress → CSV import → summary filters → responsive render");
+  console.log("Browser smoke test passed: create → progress → CSV import → exclusive filters → desktop-only render");
 } finally {
   client.close();
 }

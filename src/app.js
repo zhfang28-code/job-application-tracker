@@ -1,6 +1,7 @@
 import {
   INTERVIEW_STAGE_IDS,
   STAGES,
+  applicationCategory,
   applicationProgress,
   completeCurrentStage,
   completedStageIds,
@@ -35,11 +36,11 @@ let filters = {
   quick: "all",
 };
 
-const QUICK_FILTERS = new Set(["all", "active", "due", "interviewing", "offer", "closed"]);
+const QUICK_FILTERS = new Set(["all", "ongoing", "assessment", "interviewing", "offer", "closed"]);
 const QUICK_FILTER_TITLES = Object.freeze({
   all: "投递流程",
-  active: "进行中的投递",
-  due: "待跟进的投递",
+  ongoing: "进行中的投递",
+  assessment: "测试阶段",
   interviewing: "面试阶段",
   offer: "收到 Offer",
   closed: "已结束的投递",
@@ -161,14 +162,13 @@ function outcomeColumn(application) {
 }
 
 function baseBoardColumns(quickFilter = filters.quick) {
+  if (quickFilter === "ongoing") return STAGES.filter((stage) => stage.id === "applied");
+  if (quickFilter === "assessment") return STAGES.filter((stage) => stage.id === "assessment");
   if (quickFilter === "interviewing") {
     return STAGES.filter((stage) => INTERVIEW_STAGE_IDS.has(stage.id));
   }
   if (quickFilter === "offer") return STAGES.filter((stage) => stage.id === "offer");
   if (quickFilter === "closed") return [CLOSED_COLUMN];
-  if (["active", "due"].includes(quickFilter)) {
-    return STAGES.filter((stage) => stage.id !== "offer");
-  }
   return [...STAGES, CLOSED_COLUMN];
 }
 
@@ -356,12 +356,7 @@ function getFilteredApplications() {
     }
     if (filters.city !== "all" && application.city !== filters.city) return false;
     if (filters.stage !== "all" && outcomeColumn(application) !== filters.stage) return false;
-
-    if (filters.quick === "active" && !["active", "paused"].includes(application.status)) return false;
-    if (filters.quick === "due" && !isFollowUpDue(application)) return false;
-    if (filters.quick === "interviewing" && !(application.status === "active" && INTERVIEW_STAGE_IDS.has(application.currentStageId))) return false;
-    if (filters.quick === "offer" && application.status !== "offer") return false;
-    if (filters.quick === "closed" && !["rejected", "withdrawn"].includes(application.status)) return false;
+    if (filters.quick !== "all" && applicationCategory(application) !== filters.quick) return false;
     return true;
   }).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 }
@@ -394,7 +389,7 @@ function cardHtml(application) {
         <button class="card-more" type="button" data-action="details" data-id="${application.id}" aria-label="查看详情">${icon("more")}</button>
       </div>
       <div class="card-tags">
-        <span class="tag stage-tag" style="${stageStyle(stage.id)}">${escapeHtml(statusLabel(application))}</span>
+        <span class="tag stage-tag" style="${stageStyle(stage.id)}">${escapeHtml(stage.label)}</span>
         ${overdue ? `<span class="tag overdue-tag">待跟进</span>` : ""}
         ${statusTag}
         ${importTag}
@@ -469,13 +464,16 @@ function renderFilters() {
 function renderSummary() {
   const summary = summarize(applications);
   $("#stat-total").textContent = summary.total;
-  $("#stat-active").textContent = summary.active;
+  $("#stat-ongoing").textContent = summary.ongoing;
+  $("#stat-assessment").textContent = summary.assessment;
   $("#stat-interviewing").textContent = summary.interviewing;
   $("#stat-offers").textContent = summary.offers;
   $("#nav-total").textContent = summary.total;
-  $("#nav-due").textContent = summary.due || "";
+  $("#nav-ongoing").textContent = summary.ongoing;
+  $("#nav-assessment").textContent = summary.assessment;
   $("#nav-interviewing").textContent = summary.interviewing;
   $("#nav-offers").textContent = summary.offers;
+  $("#nav-closed").textContent = summary.closed;
   $("#active-ratio").textContent = summary.total ? `${Math.round((summary.active / summary.total) * 100)}%` : "0%";
   $("#stat-total-copy").textContent = summary.total ? `其中 ${summary.active} 个仍在推进` : "开始记录第一份机会";
 

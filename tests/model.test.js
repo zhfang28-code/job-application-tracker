@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_PIPELINE,
   INITIAL_PIPELINE,
+  applicationCategory,
   applicationProgress,
   completeCurrentStage,
   createApplication,
@@ -189,13 +190,33 @@ test("跟进日期在今天或之前时视为待跟进", () => {
   assert.equal(isFollowUpDue({ ...sample(), nextFollowUp: "2026-08-29", status: "rejected" }, today), false);
 });
 
-test("统计只把实际面试阶段计入面试中", () => {
-  const applied = sample();
-  const interviewing = moveToStage(sample({ company: "云帆" }), "ai-interview", {}, NOW);
+test("概览阶段互斥且完整覆盖所有投递", () => {
+  const ongoing = sample();
+  const assessment = moveToStage(sample({ company: "远山" }), "assessment", {}, NOW);
+  const interviewing = setOutcome(
+    moveToStage(sample({ company: "云帆" }), "ai-interview", {}, NOW),
+    "paused",
+    {},
+    NOW,
+  );
   const offered = completeCurrentStage(sample({ company: "北辰", pipeline: ["applied", "offer"] }), {}, NOW);
-  const summary = summarize([applied, interviewing, offered]);
+  const closed = setOutcome(sample({ company: "南星" }), "rejected", {}, NOW);
+  const applications = [ongoing, assessment, interviewing, offered, closed];
+  const categories = applications.map(applicationCategory);
+  const summary = summarize(applications);
 
-  assert.deepEqual(summary, { total: 3, active: 2, interviewing: 1, offers: 1, due: 0 });
+  assert.deepEqual(categories, ["ongoing", "assessment", "interviewing", "offer", "closed"]);
+  assert.deepEqual(summary, {
+    total: 5,
+    active: 3,
+    ongoing: 1,
+    assessment: 1,
+    interviewing: 1,
+    offers: 1,
+    closed: 1,
+    due: 0,
+  });
+  assert.equal(summary.ongoing + summary.assessment + summary.interviewing + summary.offers + summary.closed, summary.total);
 });
 
 test("导入合并时相同 ID 保留更新时间较新的版本", () => {

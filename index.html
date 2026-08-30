@@ -64,14 +64,19 @@
             <span>全部投递</span>
             <span class="nav-count" id="nav-total">0</span>
           </button>
-          <button class="nav-item" type="button" data-quick-filter="due">
+          <button class="nav-item" type="button" data-quick-filter="ongoing">
+            <svg class="icon"><use href="#icon-arrow"></use></svg>
+            <span>进行中</span>
+            <span class="nav-count" id="nav-ongoing">0</span>
+          </button>
+          <button class="nav-item" type="button" data-quick-filter="assessment">
             <svg class="icon"><use href="#icon-clock"></use></svg>
-            <span>待跟进</span>
-            <span class="nav-count is-alert" id="nav-due">0</span>
+            <span>测试阶段</span>
+            <span class="nav-count" id="nav-assessment">0</span>
           </button>
           <button class="nav-item" type="button" data-quick-filter="interviewing">
             <svg class="icon"><use href="#icon-message"></use></svg>
-            <span>面试中</span>
+            <span>面试阶段</span>
             <span class="nav-count" id="nav-interviewing">0</span>
           </button>
           <button class="nav-item" type="button" data-quick-filter="offer">
@@ -82,6 +87,7 @@
           <button class="nav-item" type="button" data-quick-filter="closed">
             <svg class="icon"><use href="#icon-archive"></use></svg>
             <span>已结束</span>
+            <span class="nav-count" id="nav-closed">0</span>
           </button>
         </nav>
 
@@ -133,24 +139,30 @@
               <h2 id="welcome-heading">稳稳推进每一次机会</h2>
               <p id="welcome-copy">把每个环节记清楚，下一步自然更从容。</p>
             </div>
-            <div class="mini-progress" aria-label="活跃投递占比">
-              <span id="active-ratio">0%</span>
-              <small>活跃占比</small>
+            <div class="overview-summary-actions">
+              <button class="overview-total is-selected" type="button" data-summary-filter="all" aria-pressed="true" aria-controls="pipeline-board">
+                <span class="overview-total-icon"><svg class="icon"><use href="#icon-building"></use></svg></span>
+                <span class="overview-total-copy"><small>全部投递</small><strong id="stat-total">0</strong><em id="stat-total-copy">开始记录第一份机会</em></span>
+              </button>
+              <div class="mini-progress" aria-label="活跃投递占比">
+                <span id="active-ratio">0%</span>
+                <small>活跃占比</small>
+              </div>
             </div>
           </div>
 
           <div class="stats-grid" role="group" aria-label="投递概览筛选">
-            <button class="stat-card stat-total is-selected" type="button" data-summary-filter="all" aria-pressed="true" aria-controls="pipeline-board">
-              <div class="stat-icon"><svg class="icon"><use href="#icon-building"></use></svg></div>
-              <div><span>全部投递</span><strong id="stat-total">0</strong><small id="stat-total-copy">开始记录第一份机会</small></div>
-            </button>
-            <button class="stat-card stat-active" type="button" data-summary-filter="active" aria-pressed="false" aria-controls="pipeline-board">
+            <button class="stat-card stat-active" type="button" data-summary-filter="ongoing" aria-pressed="false" aria-controls="pipeline-board">
               <div class="stat-icon"><svg class="icon"><use href="#icon-arrow"></use></svg></div>
-              <div><span>进行中</span><strong id="stat-active">0</strong><small>正在推进的流程</small></div>
+              <div><span>进行中</span><strong id="stat-ongoing">0</strong><small>已投递，等待公司下一步</small></div>
+            </button>
+            <button class="stat-card stat-assessment" type="button" data-summary-filter="assessment" aria-pressed="false" aria-controls="pipeline-board">
+              <div class="stat-icon"><svg class="icon"><use href="#icon-clock"></use></svg></div>
+              <div><span>测试阶段</span><strong id="stat-assessment">0</strong><small>在线测评、笔试或作业</small></div>
             </button>
             <button class="stat-card stat-interview" type="button" data-summary-filter="interviewing" aria-pressed="false" aria-controls="pipeline-board">
               <div class="stat-icon"><svg class="icon"><use href="#icon-message"></use></svg></div>
-              <div><span>面试阶段</span><strong id="stat-interviewing">0</strong><small>AI 面试及后续环节</small></div>
+              <div><span>面试阶段</span><strong id="stat-interviewing">0</strong><small>AI 面试及所有人工面试</small></div>
             </button>
             <button class="stat-card stat-offer" type="button" data-summary-filter="offer" aria-pressed="false" aria-controls="pipeline-board">
               <div class="stat-icon"><svg class="icon"><use href="#icon-sparkle"></use></svg></div>

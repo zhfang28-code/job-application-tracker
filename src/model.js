@@ -658,15 +658,38 @@ export function isFollowUpDue(application, today = new Date()) {
   return application.nextFollowUp <= localToday;
 }
 
+function categoryForNormalizedApplication(application) {
+  if (["rejected", "withdrawn"].includes(application.status)) return "closed";
+  if (application.status === "offer" || application.currentStageId === "offer") return "offer";
+  if (application.currentStageId === "assessment") return "assessment";
+  if (INTERVIEW_STAGE_IDS.has(application.currentStageId)) return "interviewing";
+  return "ongoing";
+}
+
+export function applicationCategory(application) {
+  return categoryForNormalizedApplication(normalizeApplication(application));
+}
+
 export function summarize(applications) {
   const normalized = applications.map(normalizeApplication);
+  const counts = {
+    ongoing: 0,
+    assessment: 0,
+    interviewing: 0,
+    offer: 0,
+    closed: 0,
+  };
+  normalized.forEach((application) => {
+    counts[categoryForNormalizedApplication(application)] += 1;
+  });
   return {
     total: normalized.length,
-    active: normalized.filter((app) => ["active", "paused"].includes(app.status)).length,
-    interviewing: normalized.filter(
-      (app) => app.status === "active" && INTERVIEW_STAGE_IDS.has(app.currentStageId),
-    ).length,
-    offers: normalized.filter((app) => app.status === "offer").length,
+    active: counts.ongoing + counts.assessment + counts.interviewing,
+    ongoing: counts.ongoing,
+    assessment: counts.assessment,
+    interviewing: counts.interviewing,
+    offers: counts.offer,
+    closed: counts.closed,
     due: normalized.filter((app) => isFollowUpDue(app)).length,
   };
 }
