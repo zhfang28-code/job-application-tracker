@@ -271,19 +271,49 @@ function cleanText(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
 
+function normalizeApplicationTarget(input = {}) {
+  const explicitEmail = cleanText(input.applicationEmail).replace(/^mailto:/i, "");
+  const rawTarget = cleanText(input.applicationTarget)
+    || explicitEmail
+    || cleanText(input.jobUrl);
+  const emailMatch = rawTarget.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+  const applicationEmail = explicitEmail || (emailMatch ? rawTarget : "");
+  const jobUrl = applicationEmail && rawTarget === applicationEmail
+    ? ""
+    : cleanText(input.jobUrl) || rawTarget;
+
+  return { jobUrl, applicationEmail };
+}
+
+function normalizeSyncMetadata(sync) {
+  if (!sync || typeof sync !== "object") return null;
+  const source = cleanText(sync.source);
+  const recordId = cleanText(sync.recordId);
+  if (!source || !recordId) return null;
+  return {
+    source,
+    recordId,
+    progress: cleanText(sync.progress),
+    sourceUpdatedAt: sync.sourceUpdatedAt ? toIsoDate(sync.sourceUpdatedAt) : "",
+    syncedAt: sync.syncedAt ? toIsoDate(sync.syncedAt) : "",
+  };
+}
+
 export function createApplication(input = {}, now = new Date()) {
   const timestamp = toIsoDate(now);
   const pipeline = normalizePipeline(input.pipeline ?? INITIAL_PIPELINE);
   const appliedAt = input.appliedAt
     ? toIsoDate(`${input.appliedAt}T12:00:00`)
     : timestamp;
+  const target = normalizeApplicationTarget(input);
 
   return {
     id: makeId("application"),
     company: cleanText(input.company),
     position: cleanText(input.position),
     city: cleanText(input.city),
-    jobUrl: cleanText(input.jobUrl),
+    jobUrl: target.jobUrl,
+    applicationEmail: target.applicationEmail,
     salary: cleanText(input.salary),
     notes: cleanText(input.notes),
     tags: Array.isArray(input.tags)
@@ -306,6 +336,7 @@ export function createApplication(input = {}, now = new Date()) {
         note: "创建投递记录",
       },
     ],
+    sync: normalizeSyncMetadata(input.sync),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -334,13 +365,15 @@ export function normalizeApplication(raw) {
     ? raw.status
     : "active";
   const timestamp = toIsoDate(raw?.createdAt);
+  const target = normalizeApplicationTarget(raw);
 
   return {
     id: cleanText(raw?.id) || makeId("application"),
     company: cleanText(raw?.company, "未命名公司"),
     position: cleanText(raw?.position, "未命名岗位"),
     city: cleanText(raw?.city),
-    jobUrl: cleanText(raw?.jobUrl),
+    jobUrl: target.jobUrl,
+    applicationEmail: target.applicationEmail,
     salary: cleanText(raw?.salary),
     notes: cleanText(raw?.notes),
     tags: Array.isArray(raw?.tags) ? raw.tags.map((tag) => cleanText(tag)).filter(Boolean) : [],
@@ -350,6 +383,7 @@ export function normalizeApplication(raw) {
     currentStageId,
     status,
     timeline,
+    sync: normalizeSyncMetadata(raw?.sync),
     createdAt: timestamp,
     updatedAt: toIsoDate(raw?.updatedAt ?? timestamp),
   };
@@ -358,6 +392,11 @@ export function normalizeApplication(raw) {
 export function updateApplication(application, input, now = new Date()) {
   const original = normalizeApplication(application);
   const pipeline = normalizePipeline(input.pipeline ?? original.pipeline);
+  const target = normalizeApplicationTarget({
+    jobUrl: input.jobUrl,
+    applicationTarget: input.applicationTarget,
+    applicationEmail: input.applicationEmail,
+  });
 
   // A stage already reached must stay in the route so history never disappears.
   const reachedStages = new Set(original.timeline.map((event) => event.stageId));
@@ -375,7 +414,8 @@ export function updateApplication(application, input, now = new Date()) {
     company: cleanText(input.company, original.company),
     position: cleanText(input.position, original.position),
     city: cleanText(input.city),
-    jobUrl: cleanText(input.jobUrl),
+    jobUrl: target.jobUrl,
+    applicationEmail: target.applicationEmail,
     salary: cleanText(input.salary),
     notes: cleanText(input.notes),
     tags: Array.isArray(input.tags)

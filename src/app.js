@@ -17,6 +17,7 @@ import {
   summarize,
   updateApplication,
 } from "./model.js";
+import { fetchFeishuSnapshot, mergeFeishuApplications } from "./feishu-sync.js";
 import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -24,6 +25,7 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 let applications = loadApplications();
 let activeDetailId = null;
+let isSyncing = false;
 let view = ["board", "list"].includes(loadPreference("view", "board"))
   ? loadPreference("view", "board")
   : "board";
@@ -46,6 +48,12 @@ const elements = {
   progressForm: $("#progress-form"),
   outcomeDialog: $("#outcome-dialog"),
   outcomeForm: $("#outcome-form"),
+  syncDialog: $("#sync-dialog"),
+  syncForm: $("#sync-form"),
+  syncButton: $("#sync-button"),
+  syncSidebarButton: $("#sync-sidebar-button"),
+  syncSettingsButton: $("#sync-settings-button"),
+  syncSettingsSidebarButton: $("#sync-settings-sidebar-button"),
   search: $("#search-input"),
   cityFilter: $("#city-filter"),
   stageFilter: $("#stage-filter"),
@@ -89,6 +97,17 @@ function safeUrl(value) {
   } catch {
     return "";
   }
+}
+
+function applicationTarget(application) {
+  const email = String(application.applicationEmail ?? "").trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { href: `mailto:${email}`, value: email, label: "发送投递邮件", kind: "email" };
+  }
+  const url = safeUrl(application.jobUrl);
+  return url
+    ? { href: url, value: url, label: "打开投递链接", kind: "url" }
+    : { href: "", value: String(application.jobUrl ?? "").trim(), label: "", kind: "text" };
 }
 
 function icon(name, className = "icon") {
@@ -177,6 +196,97 @@ function showToast(message, type = "success") {
   window.setTimeout(() => toast.remove(), 3200);
 }
 
+function loadSyncSettings() {
+  return {
+    endpoint: loadPreference("feishuSyncEndpoint", "").trim(),
+    accessToken: loadPreference("feishuSyncAccessToken", "").trim(),
+    autoSync: loadPreference("feishuAutoSync", "true") !== "false",
+    lastSync: loadPreference("feishuLastSync", ""),
+    lastError: loadPreference("feishuLastError", ""),
+  };
+}
+
+function renderSyncStatus() {
+  const settings = loadSyncSettings();
+  const configured = Boolean(settings.endpoint && settings.accessToken);
+  const card = elements.syncSettingsSidebarButton;
+  card.classList.toggle("is-configured", configured && !settings.lastError);
+  card.classList.toggle("is-error", Boolean(settings.lastError));
+  card.classList.toggle("is-syncing", isSyncing);
+  elements.syncButton.classList.toggle("is-syncing", isSyncing);
+  elements.syncButton.disabled = isSyncing;
+  elements.syncSidebarButton.disabled = isSyncing;
+
+  let title = "飞书同步未配置";
+  let copy = "点击配置单向同步";
+  if (isSyncing) {
+    title = "正在读取飞书";
+    copy = "只同步投递字段";
+  } else if (settings.lastError) {
+    title = "上次同步失败";
+    copy = settings.lastError;
+  } else if (configured && settings.lastSync) {
+    title = "飞书单向同步";
+    copy = `上次 ${formatDate(settings.lastSync, dateTimeFormatter)}`;
+  } else if (configured) {
+    title = "飞书单向同步";
+    copy = settings.autoSync ? "打开页面时自动更新" : "已关闭自动同步";
+  }
+  $("#sync-status-title").textContent = title;
+  $("#sync-status-copy").textContent = copy;
+  elements.syncButton.title = configured ? "立即从飞书同步" : "配置飞书同步";
+}
+
+function openSyncSettings() {
+  const settings = loadSyncSettings();
+  elements.syncForm.elements.endpoint.value = settings.endpoint;
+  elements.syncForm.elements.accessToken.value = settings.accessToken;
+  elements.syncForm.elements.autoSync.checked = settings.autoSync;
+  elements.syncDialog.showModal();
+  window.setTimeout(() => elements.syncForm.elements.endpoint.focus(), 50);
+}
+
+async function syncFromFeishu({ silent = false } = {}) {
+  if (isSyncing) return;
+  const settings = loadSyncSettings();
+  if (!settings.endpoint || !settings.accessToken) {
+    if (!silent) openSyncSettings();
+    return;
+  }
+
+  isSyncing = true;
+  savePreference("feishuLastError", "");
+  renderSyncStatus();
+  try {
+    const snapshot = await fetchFeishuSnapshot({
+      endpoint: settings.endpoint,
+      accessToken: settings.accessToken,
+    });
+    const result = mergeFeishuApplications(applications, snapshot.records, {
+      syncedAt: snapshot.syncedAt,
+    });
+    applications = result.applications;
+    saveApplications(applications);
+    savePreference("feishuLastSync", result.syncedAt);
+    savePreference("feishuLastError", "");
+    renderAll();
+    if (!silent) {
+      const { created, updated } = result.stats;
+      showToast(created || updated
+        ? `飞书同步完成：新增 ${created} 条，更新 ${updated} 条`
+        : "飞书同步完成，暂无变化");
+    }
+  } catch (error) {
+    console.error("Feishu sync failed", error);
+    const message = error?.message || "飞书同步失败，请稍后重试";
+    savePreference("feishuLastError", message);
+    if (!silent) showToast(message, "error");
+  } finally {
+    isSyncing = false;
+    renderSyncStatus();
+  }
+}
+
 function setJobLinkAnalysisStatus(message = DEFAULT_JOB_LINK_ANALYSIS_COPY, state = "") {
   elements.jobLinkAnalysisStatus.textContent = message;
   elements.jobLinkAnalysisStatus.classList.toggle("is-success", state === "success");
@@ -186,6 +296,10 @@ function setJobLinkAnalysisStatus(message = DEFAULT_JOB_LINK_ANALYSIS_COPY, stat
 function analyzeCompanyFromJobUrl({ announce = false } = {}) {
   const jobUrlField = elements.applicationForm.elements.jobUrl;
   const companyField = elements.applicationForm.elements.company;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(jobUrlField.value.trim())) {
+    setJobLinkAnalysisStatus("已识别为投递邮箱；请手动填写公司名称。", "success");
+    return;
+  }
   const result = inferCompanyFromUrl(jobUrlField.value);
 
   if (!jobUrlField.value.trim()) {
@@ -252,9 +366,10 @@ function openApplicationForm(application = null) {
     title.textContent = "编辑投递";
     submitLabel.lastChild.textContent = "保存修改";
     idField.value = application.id;
-    for (const name of ["company", "position", "city", "salary", "jobUrl", "nextFollowUp", "notes"]) {
+    for (const name of ["company", "position", "city", "salary", "nextFollowUp", "notes"]) {
       elements.applicationForm.elements[name].value = application[name] ?? "";
     }
+    elements.applicationForm.elements.jobUrl.value = application.applicationEmail || application.jobUrl || "";
     elements.applicationForm.elements.appliedAt.value = formatDateInput(application.appliedAt);
     elements.applicationForm.elements.tags.value = application.tags.join("，");
   }
@@ -271,6 +386,8 @@ function getFilteredApplications() {
         application.position,
         application.city,
         application.salary,
+        application.jobUrl,
+        application.applicationEmail,
         application.tags.join(" "),
         application.notes,
       ].join(" ").toLocaleLowerCase("zh-CN");
@@ -298,6 +415,9 @@ function cardHtml(application) {
     : closed
       ? `<span class="tag status-tag">${escapeHtml(statusLabel(application))}</span>`
       : "";
+  const syncTag = application.sync?.source === "feishu"
+    ? `<span class="tag sync-source-tag">飞书同步</span>`
+    : "";
   const quickButton = !closed && application.status !== "offer"
     ? `<button class="quick-progress" type="button" data-action="progress" data-id="${application.id}">${icon("arrow")}记录新进展</button>`
     : "";
@@ -315,6 +435,7 @@ function cardHtml(application) {
         <span class="tag stage-tag" style="${stageStyle(stage.id)}">${escapeHtml(statusLabel(application))}</span>
         ${overdue ? `<span class="tag overdue-tag">待跟进</span>` : ""}
         ${statusTag}
+        ${syncTag}
         ${tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
       </div>
       <div class="card-meta">
@@ -352,19 +473,19 @@ function renderBoard(items) {
 function renderList(items) {
   elements.list.innerHTML = `
     <table class="application-table">
-      <thead><tr><th>公司 / 岗位</th><th>城市</th><th>当前进度</th><th>投递日期</th><th>流程完成度</th><th>岗位链接</th></tr></thead>
+      <thead><tr><th>公司 / 岗位</th><th>城市</th><th>当前进度</th><th>投递日期</th><th>流程完成度</th><th>链接 / 邮箱</th></tr></thead>
       <tbody>
         ${items.map((application) => {
           const stage = stageById(application.currentStageId);
           const progress = applicationProgress(application);
-          const url = safeUrl(application.jobUrl);
+          const target = applicationTarget(application);
           return `<tr data-open-detail="${application.id}" tabindex="0">
             <td><div class="table-company"><span class="company-avatar" style="${avatarStyle(application.company)}">${escapeHtml(companyInitial(application.company))}</span><span><strong>${escapeHtml(application.company)}</strong><small>${escapeHtml(application.position)}</small></span></div></td>
             <td>${escapeHtml(application.city || "—")}</td>
             <td><span class="table-stage" style="${stageStyle(stage.id)}"><i class="stage-dot"></i>${escapeHtml(statusLabel(application))}</span></td>
             <td>${formatDate(application.appliedAt, fullDateFormatter)}</td>
             <td><span class="table-progress"><span class="progress-track" style="${stageStyle(stage.id)}"><span style="width:${progress}%"></span></span>${progress}%</span></td>
-            <td>${url ? `<a class="table-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" data-stop-detail>查看岗位</a>` : "—"}</td>
+            <td>${target.href ? `<a class="table-link" href="${escapeHtml(target.href)}" ${target.kind === "url" ? "target=\"_blank\" rel=\"noopener noreferrer\"" : ""} data-stop-detail>${escapeHtml(target.kind === "email" ? "发送邮件" : "查看链接")}</a>` : escapeHtml(target.value || "—")}</td>
           </tr>`;
         }).join("")}
       </tbody>
@@ -494,7 +615,7 @@ function renderDetail(applicationId) {
     return;
   }
   const stage = stageById(application.currentStageId);
-  const url = safeUrl(application.jobUrl);
+  const target = applicationTarget(application);
   const closed = ["rejected", "withdrawn"].includes(application.status);
   const statusClass = application.status === "offer" ? " is-offer" : closed ? " is-closed" : "";
   const primaryAction = !closed && application.status !== "offer"
@@ -515,9 +636,9 @@ function renderDetail(applicationId) {
         ${application.city ? `<span>${icon("pin")}${escapeHtml(application.city)}</span>` : ""}
         <span>${icon("calendar")}投递于 ${formatDate(application.appliedAt, fullDateFormatter)}</span>
         ${application.salary ? `<span>${escapeHtml(application.salary)}</span>` : ""}
-        ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${icon("link")}打开岗位链接</a>` : ""}
+        ${target.href ? `<a href="${escapeHtml(target.href)}" ${target.kind === "url" ? "target=\"_blank\" rel=\"noopener noreferrer\"" : ""}>${icon("link")}${escapeHtml(target.label)}</a>` : target.value ? `<span>${icon("link")}${escapeHtml(target.value)}</span>` : ""}
       </div>
-      ${application.tags.length ? `<div class="detail-tags">${application.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+      ${application.tags.length || application.sync?.source === "feishu" ? `<div class="detail-tags">${application.sync?.source === "feishu" ? `<span class="tag sync-source-tag">飞书单向同步</span>` : ""}${application.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
       <div class="detail-actions">
         ${primaryAction}
         <div class="detail-secondary-actions">
@@ -625,7 +746,7 @@ function safeCsvCell(value) {
 }
 
 function exportCsv() {
-  const headers = ["公司", "岗位", "城市", "当前进度", "状态", "投递日期", "下次跟进", "薪资", "岗位链接", "标签", "备注"];
+  const headers = ["公司", "岗位", "城市", "当前进度", "状态", "投递日期", "下次跟进", "薪资", "投递链接/邮箱", "标签", "备注"];
   const rows = applications.map((application) => [
     application.company,
     application.position,
@@ -635,7 +756,7 @@ function exportCsv() {
     formatDateInput(application.appliedAt),
     application.nextFollowUp,
     application.salary,
-    application.jobUrl,
+    application.applicationEmail || application.jobUrl,
     application.tags.join("；"),
     application.notes,
   ]);
@@ -659,6 +780,10 @@ function initializeTheme() {
 function setupEventListeners() {
   $("#add-application-button").addEventListener("click", () => openApplicationForm());
   $("#empty-action").addEventListener("click", () => applications.length ? resetFilters() : openApplicationForm());
+  elements.syncButton.addEventListener("click", () => syncFromFeishu());
+  elements.syncSidebarButton.addEventListener("click", () => syncFromFeishu());
+  elements.syncSettingsButton.addEventListener("click", openSyncSettings);
+  elements.syncSettingsSidebarButton.addEventListener("click", openSyncSettings);
   elements.analyzeJobLinkButton.addEventListener("click", () => analyzeCompanyFromJobUrl({ announce: true }));
   elements.applicationForm.elements.jobUrl.addEventListener("change", () => analyzeCompanyFromJobUrl());
   elements.applicationForm.elements.jobUrl.addEventListener("input", () => setJobLinkAnalysisStatus());
@@ -676,10 +801,35 @@ function setupEventListeners() {
     button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog)?.close());
   });
 
-  [elements.applicationDialog, elements.detailDialog, elements.progressDialog, elements.outcomeDialog].forEach((dialog) => {
+  [elements.applicationDialog, elements.detailDialog, elements.progressDialog, elements.outcomeDialog, elements.syncDialog].forEach((dialog) => {
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
     });
+  });
+
+  elements.syncForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!elements.syncForm.reportValidity()) return;
+    savePreference("feishuSyncEndpoint", formValue(elements.syncForm, "endpoint").trim());
+    savePreference("feishuSyncAccessToken", formValue(elements.syncForm, "accessToken").trim());
+    savePreference("feishuAutoSync", String(elements.syncForm.elements.autoSync.checked));
+    savePreference("feishuLastError", "");
+    elements.syncDialog.close();
+    renderSyncStatus();
+    syncFromFeishu();
+  });
+
+  $("#clear-sync-settings-button").addEventListener("click", () => {
+    for (const key of [
+      "feishuSyncEndpoint",
+      "feishuSyncAccessToken",
+      "feishuLastSync",
+      "feishuLastError",
+    ]) savePreference(key, "");
+    savePreference("feishuAutoSync", "true");
+    elements.syncDialog.close();
+    renderSyncStatus();
+    showToast("飞书同步设置已清除；现有投递记录仍保留");
   });
 
   elements.applicationForm.addEventListener("submit", (event) => {
@@ -894,7 +1044,13 @@ function initialize() {
   }).format(new Date());
   setupEventListeners();
   renderAll();
+  renderSyncStatus();
   document.documentElement.dataset.appReady = "true";
+
+  const syncSettings = loadSyncSettings();
+  if (syncSettings.endpoint && syncSettings.accessToken && syncSettings.autoSync) {
+    window.setTimeout(() => syncFromFeishu({ silent: true }), 250);
+  }
 
   if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
     window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(console.warn));

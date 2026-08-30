@@ -1,4 +1,4 @@
-const CACHE_NAME = "jobtrail-static-v3";
+const CACHE_NAME = "jobtrail-static-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./src/app.js",
   "./src/model.js",
   "./src/storage.js",
+  "./src/feishu-sync.js",
 ];
 
 self.addEventListener("install", (event) => {

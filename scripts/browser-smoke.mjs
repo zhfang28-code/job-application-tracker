@@ -115,6 +115,14 @@ try {
   client.browserExceptions.length = 0;
   assert.equal(await evaluate(client, "document.querySelectorAll('.application-card').length"), 0);
 
+  await evaluate(client, "document.querySelector('#sync-button').click(); true");
+  await waitFor(client, "document.querySelector('#sync-dialog').open");
+  assert.equal(await evaluate(client, "document.querySelector('#sync-form').textContent.includes('不读取简历')"), true);
+  assert.equal(await evaluate(client, "document.querySelector('#sync-form').elements.endpoint.required && document.querySelector('#sync-form').elements.accessToken.required"), true);
+  await sleep(250);
+  await saveScreenshot(client, "feishu-sync-settings-desktop.png");
+  await evaluate(client, "document.querySelector('[data-close-dialog=\"sync-dialog\"]').click(); true");
+
   await evaluate(client, "document.querySelector('#add-application-button').click(); true");
   await waitFor(client, "document.querySelector('#application-dialog').open");
   await sleep(250);
@@ -190,7 +198,7 @@ try {
   await saveScreenshot(client, "new-application-mobile.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: create → choose actual next stage → timeline → responsive render");
+  console.log("Browser smoke test passed: Feishu settings → create → choose actual next stage → timeline → responsive render");
 } finally {
   client.close();
 }
