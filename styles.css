@@ -29,6 +29,7 @@
   --radius: 14px;
   --radius-lg: 20px;
   --sidebar-width: 238px;
+  --board-column-width: 340px;
   --font: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
@@ -610,7 +611,7 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
 
 .pipeline-board {
   display: grid;
-  grid-auto-columns: minmax(340px, 1fr);
+  grid-auto-columns: var(--board-column-width);
   grid-auto-flow: column;
   gap: 16px;
   align-items: start;
@@ -651,6 +652,7 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
 
 .application-card {
   position: relative;
+  min-height: 218px;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -952,17 +954,19 @@ dialog::backdrop {
 .progress-footer { justify-content: flex-end; }
 .progress-footer > div { display: flex; gap: 8px; }
 
-.outcome-options { display: grid; gap: 8px; margin-bottom: 16px; }
+.outcome-options { display: grid; gap: 10px; margin-bottom: 19px; }
 .outcome-options label { cursor: pointer; }
 .outcome-options input { position: absolute; opacity: 0; }
-.outcome-options label > span { display: block; padding: 11px 13px 11px 38px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
-.outcome-options label > span::before { position: absolute; width: 14px; height: 14px; margin: 2px 0 0 -25px; border: 1.5px solid var(--line-strong); border-radius: 50%; content: ""; }
+.outcome-options label > span { display: block; min-height: 66px; padding: 13px 16px 13px 46px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
+.outcome-options label > span::before { position: absolute; width: 18px; height: 18px; margin: 2px 0 0 -31px; border: 1.5px solid var(--line-strong); border-radius: 50%; content: ""; }
 .outcome-options strong,
 .outcome-options small { display: block; }
-.outcome-options strong { font-size: 10px; }
-.outcome-options small { margin-top: 2px; color: var(--text-faint); font-size: 8px; }
+.outcome-options strong { font-size: 14px; line-height: 1.35; }
+.outcome-options small { margin-top: 3px; color: var(--text-faint); font-size: 12px; line-height: 1.4; }
 .outcome-options input:checked + span { border-color: var(--primary); background: var(--primary-soft); }
 .outcome-options input:checked + span::before { border: 4px solid var(--primary); background: var(--surface); }
+.outcome-modal .form-field { font-size: 13px; }
+.outcome-modal .form-field textarea { min-height: 92px; font-size: 13px; }
 
 .toast-region {
   position: fixed;

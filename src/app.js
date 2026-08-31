@@ -17,9 +17,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260830-4";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260830-4";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260830-4";
+} from "./model.js?v=20260831-1";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260831-1";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260831-1";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];

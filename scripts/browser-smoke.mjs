@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260830-4')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260830-4'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260831-1')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260831-1'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260830-4'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260830-4'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260830-4'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260831-1'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260831-1'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260831-1'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -285,10 +285,12 @@ try {
   const boardCardSize = await evaluate(client, `(() => ({
     title: Number.parseFloat(getComputedStyle(document.querySelector('.card-title h4')).fontSize),
     width: document.querySelector('.application-card').getBoundingClientRect().width,
+    columnWidth: document.querySelector('.board-column').getBoundingClientRect().width,
     minBodyWidth: getComputedStyle(document.body).minWidth,
   }))()`);
   assert.equal(boardCardSize.title >= 16, true);
-  assert.equal(boardCardSize.width >= 340, true);
+  assert.equal(boardCardSize.columnWidth, 340);
+  assert.equal(boardCardSize.width >= 300 && boardCardSize.width <= 310, true);
   assert.equal(boardCardSize.minBodyWidth, "1280px");
   await saveScreenshot(client, "summary-filter-ongoing-desktop.png");
 
@@ -335,6 +337,15 @@ try {
   await waitFor(client, "document.querySelector('#detail-dialog').open && document.querySelector('#detail-content').textContent.includes('平川机械')");
   await evaluate(client, "document.querySelector('#detail-content [data-detail-action=\"status\"]').click(); true");
   await waitFor(client, "document.querySelector('#outcome-dialog').open");
+  const outcomeFontSizes = await evaluate(client, `(() => ({
+    title: Number.parseFloat(getComputedStyle(document.querySelector('.outcome-options strong')).fontSize),
+    description: Number.parseFloat(getComputedStyle(document.querySelector('.outcome-options small')).fontSize),
+    fieldLabel: Number.parseFloat(getComputedStyle(document.querySelector('.outcome-modal .form-field')).fontSize),
+  }))()`);
+  assert.equal(outcomeFontSizes.title >= 14, true);
+  assert.equal(outcomeFontSizes.description >= 12, true);
+  assert.equal(outcomeFontSizes.fieldLabel >= 13, true);
+  await saveScreenshot(client, "outcome-status-desktop.png");
   await evaluate(client, `(() => {
     const form = document.querySelector('#outcome-form');
     form.querySelector('[name="status"][value="rejected"]').checked = true;
