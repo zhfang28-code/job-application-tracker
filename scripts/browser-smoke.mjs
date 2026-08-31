@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260831-1')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260831-1'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260831-2')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260831-2'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260831-1'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260831-1'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260831-1'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260831-2'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260831-2'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260831-2'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -274,6 +274,7 @@ try {
     await evaluate(client, "[...document.querySelectorAll('.board-column')].map((item) => item.dataset.stageTarget)"),
     ["assessment"],
   );
+  assert.equal(await evaluate(client, "document.querySelector('#pipeline-board').classList.contains('is-card-grid')"), true);
   await saveScreenshot(client, "summary-filter-assessment-desktop.png");
 
   await evaluate(client, "document.querySelector('[data-summary-filter=\"ongoing\"]').click(); true");
@@ -286,11 +287,24 @@ try {
     title: Number.parseFloat(getComputedStyle(document.querySelector('.card-title h4')).fontSize),
     width: document.querySelector('.application-card').getBoundingClientRect().width,
     columnWidth: document.querySelector('.board-column').getBoundingClientRect().width,
+    horizontalLayout: (() => {
+      const cards = document.querySelector('.column-cards');
+      const original = cards.querySelector('.application-card');
+      const clone = original.cloneNode(true);
+      cards.append(clone);
+      const first = original.getBoundingClientRect();
+      const second = clone.getBoundingClientRect();
+      clone.remove();
+      return first.top === second.top && second.left > first.left;
+    })(),
+    cardGrid: document.querySelector('#pipeline-board').classList.contains('is-card-grid'),
     minBodyWidth: getComputedStyle(document.body).minWidth,
   }))()`);
   assert.equal(boardCardSize.title >= 16, true);
-  assert.equal(boardCardSize.columnWidth, 340);
+  assert.equal(boardCardSize.columnWidth > 900, true);
   assert.equal(boardCardSize.width >= 300 && boardCardSize.width <= 310, true);
+  assert.equal(boardCardSize.horizontalLayout, true);
+  assert.equal(boardCardSize.cardGrid, true);
   assert.equal(boardCardSize.minBodyWidth, "1280px");
   await saveScreenshot(client, "summary-filter-ongoing-desktop.png");
 

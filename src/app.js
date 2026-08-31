@@ -17,9 +17,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260831-1";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260831-1";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260831-1";
+} from "./model.js?v=20260831-2";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260831-2";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260831-2";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -407,6 +407,7 @@ function cardHtml(application) {
 
 function renderBoard(items) {
   const columns = currentBoardColumns();
+  elements.board.classList.toggle("is-card-grid", ["ongoing", "assessment"].includes(filters.quick));
 
   elements.board.innerHTML = columns.map((column) => {
     const cards = items.filter((application) => outcomeColumn(application) === column.id);

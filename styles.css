@@ -622,6 +622,20 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
   scrollbar-width: thin;
 }
 
+.pipeline-board.is-card-grid {
+  display: block;
+  overflow-x: visible;
+  scroll-snap-type: none;
+}
+
+.pipeline-board.is-card-grid .board-column { width: 100%; }
+.pipeline-board.is-card-grid .column-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, calc(var(--board-column-width) - 32px));
+  align-items: start;
+}
+.pipeline-board.is-card-grid .column-empty { grid-column: 1 / -1; }
+
 .board-column {
   min-height: 370px;
   padding: 15px;
