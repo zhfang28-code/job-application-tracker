@@ -17,9 +17,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260831-2";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260831-2";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260831-2";
+} from "./model.js?v=20260901-1";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260901-1";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260901-1";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -63,6 +63,8 @@ const elements = {
   cityFilter: $("#city-filter"),
   stageFilter: $("#stage-filter"),
   analyzeJobLinkButton: $("#analyze-job-link-button"),
+  openJobLinkButton: $("#open-job-link-button"),
+  openJobLinkLabel: $("#open-job-link-label"),
   jobLinkAnalysisStatus: $("#job-link-analysis-status"),
   importFile: $("#import-file"),
   csvImportFile: $("#csv-import-file"),
@@ -85,7 +87,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
   minute: "2-digit",
   hour12: false,
 });
-const DEFAULT_JOB_LINK_ANALYSIS_COPY = "支持企业招聘官网及链接中包含公司信息的页面；只在本地分析。";
+const DEFAULT_JOB_LINK_ANALYSIS_COPY = "粘贴后可直接打开链接；公司信息只在本地分析。";
 
 function escapeHtml(value = "") {
   return String(value)
@@ -97,23 +99,32 @@ function escapeHtml(value = "") {
 }
 
 function safeUrl(value) {
+  const rawValue = String(value ?? "").trim();
+  if (!rawValue || (/^[a-z][a-z\d+.-]*:/i.test(rawValue) && !/^https?:\/\//i.test(rawValue))) return "";
   try {
-    const url = new URL(value);
+    const url = new URL(/^https?:\/\//i.test(rawValue) ? rawValue : `https://${rawValue}`);
     return ["http:", "https:"].includes(url.protocol) ? url.href : "";
   } catch {
     return "";
   }
 }
 
+function directTarget(value) {
+  const rawValue = String(value ?? "").trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawValue)) {
+    return { href: `mailto:${rawValue}`, value: rawValue, label: "发送邮件", kind: "email" };
+  }
+  const url = safeUrl(rawValue);
+  return url
+    ? { href: url, value: url, label: "打开链接", kind: "url" }
+    : { href: "", value: rawValue, label: "打开链接", kind: "text" };
+}
+
 function applicationTarget(application) {
   const email = String(application.applicationEmail ?? "").trim();
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { href: `mailto:${email}`, value: email, label: "发送投递邮件", kind: "email" };
-  }
-  const url = safeUrl(application.jobUrl);
-  return url
-    ? { href: url, value: url, label: "打开投递链接", kind: "url" }
-    : { href: "", value: String(application.jobUrl ?? "").trim(), label: "", kind: "text" };
+  const target = directTarget(email || application.jobUrl);
+  if (!target.href) return { ...target, label: "" };
+  return { ...target, label: target.kind === "email" ? "发送投递邮件" : "打开投递链接" };
 }
 
 function icon(name, className = "icon") {
@@ -254,9 +265,35 @@ function setJobLinkAnalysisStatus(message = DEFAULT_JOB_LINK_ANALYSIS_COPY, stat
   elements.jobLinkAnalysisStatus.classList.toggle("is-warning", state === "warning");
 }
 
+function updateOpenJobLinkButton() {
+  const target = directTarget(elements.applicationForm.elements.jobUrl.value);
+  const enabled = Boolean(target.href);
+  elements.openJobLinkLabel.textContent = target.label;
+  elements.openJobLinkButton.classList.toggle("is-disabled", !enabled);
+  elements.openJobLinkButton.setAttribute("aria-disabled", String(!enabled));
+  elements.openJobLinkButton.tabIndex = enabled ? 0 : -1;
+
+  if (!enabled) {
+    elements.openJobLinkButton.removeAttribute("href");
+    elements.openJobLinkButton.removeAttribute("target");
+    elements.openJobLinkButton.removeAttribute("rel");
+    return;
+  }
+
+  elements.openJobLinkButton.href = target.href;
+  if (target.kind === "url") {
+    elements.openJobLinkButton.target = "_blank";
+    elements.openJobLinkButton.rel = "noopener noreferrer";
+  } else {
+    elements.openJobLinkButton.removeAttribute("target");
+    elements.openJobLinkButton.removeAttribute("rel");
+  }
+}
+
 function analyzeCompanyFromJobUrl({ announce = false } = {}) {
   const jobUrlField = elements.applicationForm.elements.jobUrl;
   const companyField = elements.applicationForm.elements.company;
+  updateOpenJobLinkButton();
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(jobUrlField.value.trim())) {
     setJobLinkAnalysisStatus("已识别为投递邮箱；请手动填写公司名称。", "success");
     return;
@@ -334,6 +371,7 @@ function openApplicationForm(application = null) {
     elements.applicationForm.elements.appliedAt.value = formatDateInput(application.appliedAt);
     elements.applicationForm.elements.tags.value = application.tags.join("，");
   }
+  updateOpenJobLinkButton();
   elements.applicationDialog.showModal();
   window.setTimeout(() => elements.applicationForm.elements.company.focus(), 50);
 }
@@ -756,8 +794,14 @@ function setupEventListeners() {
   $("#add-application-button").addEventListener("click", () => openApplicationForm());
   $("#empty-action").addEventListener("click", () => applications.length ? resetFilters() : openApplicationForm());
   elements.analyzeJobLinkButton.addEventListener("click", () => analyzeCompanyFromJobUrl({ announce: true }));
+  elements.openJobLinkButton.addEventListener("click", (event) => {
+    if (elements.openJobLinkButton.getAttribute("aria-disabled") === "true") event.preventDefault();
+  });
   elements.applicationForm.elements.jobUrl.addEventListener("change", () => analyzeCompanyFromJobUrl());
-  elements.applicationForm.elements.jobUrl.addEventListener("input", () => setJobLinkAnalysisStatus());
+  elements.applicationForm.elements.jobUrl.addEventListener("input", () => {
+    setJobLinkAnalysisStatus();
+    updateOpenJobLinkButton();
+  });
   elements.applicationForm.elements.jobUrl.addEventListener("paste", () => {
     window.setTimeout(() => analyzeCompanyFromJobUrl(), 0);
   });

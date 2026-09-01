@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260831-2')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260831-2'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-1')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260901-1'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260831-2'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260831-2'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260831-2'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260901-1'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260901-1'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-1'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -126,6 +126,10 @@ try {
 
   await evaluate(client, "document.querySelector('#add-application-button').click(); true");
   await waitFor(client, "document.querySelector('#application-dialog').open");
+  assert.deepEqual(await evaluate(client, `(() => {
+    const link = document.querySelector('#open-job-link-button');
+    return { disabled: link.getAttribute('aria-disabled'), href: link.getAttribute('href') };
+  })()`), { disabled: "true", href: null });
   await sleep(250);
   await saveScreenshot(client, "new-application-desktop.png");
 
@@ -136,8 +140,13 @@ try {
     form.elements.city.value = '上海';
     form.elements.salary.value = '25k–35k · 14薪';
     form.elements.jobUrl.value = 'https://jobs.example.com/frontend?companyName=%E6%98%9F%E6%B2%B3%E7%A7%91%E6%8A%80';
+    form.elements.jobUrl.dispatchEvent(new Event('input', { bubbles: true }));
     document.querySelector('#analyze-job-link-button').click();
     if (form.elements.company.value !== '星河科技') throw new Error('Company inference failed');
+    const directLink = document.querySelector('#open-job-link-button');
+    if (directLink.getAttribute('aria-disabled') !== 'false') throw new Error('Direct link was not enabled');
+    if (directLink.href !== form.elements.jobUrl.value) throw new Error('Direct link URL mismatch');
+    if (directLink.target !== '_blank' || !directLink.rel.includes('noopener')) throw new Error('Direct link is not safely opened in a new tab');
     form.elements.nextFollowUp.value = '2026-08-30';
     form.elements.tags.value = '重点，内推';
     form.elements.notes.value = '重点准备 React 性能优化与项目难点。';

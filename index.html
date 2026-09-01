@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20260831-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260901-1" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -251,9 +251,10 @@
                 <label for="job-url-input">投递链接 / 邮箱</label>
                 <div class="field-control-row">
                   <input id="job-url-input" name="jobUrl" type="text" inputmode="url" placeholder="https://… 或 jobs@example.com" aria-describedby="job-link-analysis-status" />
+                  <a class="field-inline-button field-open-link-button is-disabled" id="open-job-link-button" aria-disabled="true" tabindex="-1"><svg class="icon"><use href="#icon-link"></use></svg><span id="open-job-link-label">打开链接</span></a>
                   <button class="field-inline-button" type="button" id="analyze-job-link-button"><svg class="icon"><use href="#icon-sparkle"></use></svg>识别公司</button>
                 </div>
-                <small class="field-hint" id="job-link-analysis-status" aria-live="polite">支持企业招聘官网及链接中包含公司信息的页面；只在本地分析。</small>
+                <small class="field-hint" id="job-link-analysis-status" aria-live="polite">粘贴后可直接打开链接；公司信息只在本地分析。</small>
               </div>
               <label class="form-field"><span>公司名称 *</span><input name="company" required maxlength="80" autocomplete="organization" placeholder="粘贴链接自动识别，或手动输入" /></label>
               <label class="form-field"><span>岗位名称 *</span><input name="position" required maxlength="100" placeholder="例如：前端开发工程师" /></label>
@@ -367,11 +368,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20260831-2", { updateViaCache: "none" })
+          .register("./sw.js?v=20260901-1", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20260831-2"></script>
+    <script type="module" src="./src/app.js?v=20260901-1"></script>
   </body>
 </html>

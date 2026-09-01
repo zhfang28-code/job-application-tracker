@@ -859,6 +859,10 @@ dialog::backdrop {
 .field-inline-button:hover { border-color: color-mix(in srgb, var(--primary) 52%, var(--line)); background: color-mix(in srgb, var(--primary) 13%, var(--surface)); }
 .field-inline-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 18%, transparent); outline-offset: 1px; }
 .field-inline-button .icon { width: 14px; height: 14px; }
+.field-open-link-button { min-width: 96px; border-color: var(--line); background: var(--surface); color: var(--text-soft); text-decoration: none; }
+.field-open-link-button:not(.is-disabled) { border-color: color-mix(in srgb, var(--green) 30%, var(--line)); background: var(--green-soft); color: var(--green); }
+.field-open-link-button:not(.is-disabled):hover { border-color: color-mix(in srgb, var(--green) 42%, var(--line)); background: var(--green-soft); color: var(--green); }
+.field-open-link-button.is-disabled { opacity: 0.46; cursor: not-allowed; }
 .field-hint { color: var(--text-faint); font-size: 8px; font-weight: 500; line-height: 1.5; }
 .field-hint.is-success { color: var(--green); }
 .field-hint.is-warning { color: var(--orange); }

@@ -33,6 +33,7 @@ test("新版概览所需的统计节点完整存在", async () => {
     "stat-interviewing",
     "stat-offers",
     "nav-closed",
+    "open-job-link-button",
   ]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
