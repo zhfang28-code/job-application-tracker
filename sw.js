@@ -1,4 +1,4 @@
-const RELEASE = "20260901-2";
+const RELEASE = "20260901-3";
 const CACHE_NAME = `jobtrail-static-${RELEASE}`;
 const versioned = (path) => `${path}?v=${RELEASE}`;
 const APP_SHELL = [

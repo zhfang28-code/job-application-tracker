@@ -1,4 +1,4 @@
-import { STORAGE_KEY, normalizeApplication } from "./model.js?v=20260901-2";
+import { STORAGE_KEY, normalizeApplication } from "./model.js?v=20260901-3";
 
 export function loadApplications(storage = globalThis.localStorage) {
   try {

@@ -652,8 +652,12 @@ export function daysSince(isoDate, now = new Date()) {
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86_400_000));
 }
 
+export function hasScheduledFollowUp(application) {
+  return Boolean(cleanText(application?.nextFollowUp)) && !TERMINAL_STATUSES.has(application?.status);
+}
+
 export function isFollowUpDue(application, today = new Date()) {
-  if (!application.nextFollowUp || TERMINAL_STATUSES.has(application.status)) return false;
+  if (!hasScheduledFollowUp(application)) return false;
   const localToday = [
     today.getFullYear(),
     String(today.getMonth() + 1).padStart(2, "0"),
@@ -694,6 +698,7 @@ export function summarize(applications) {
     interviewing: counts.interviewing,
     offers: counts.offer,
     closed: counts.closed,
+    followUps: normalized.filter((app) => hasScheduledFollowUp(app)).length,
     due: normalized.filter((app) => isFollowUpDue(app)).length,
   };
 }

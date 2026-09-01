@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-2')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260901-2'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-3')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260901-3'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260901-2'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260901-2'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-2'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260901-3'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260901-3'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-3'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -147,7 +147,7 @@ try {
     if (directLink.getAttribute('aria-disabled') !== 'false') throw new Error('Direct link was not enabled');
     if (directLink.href !== form.elements.jobUrl.value) throw new Error('Direct link URL mismatch');
     if (directLink.target !== '_blank' || !directLink.rel.includes('noopener')) throw new Error('Direct link is not safely opened in a new tab');
-    form.elements.nextFollowUp.value = '2026-08-30';
+    form.elements.nextFollowUp.value = '2030-09-30';
     form.elements.tags.value = '重点，内推';
     form.elements.notes.value = '重点准备 React 性能优化与项目难点。';
     return true;
@@ -238,7 +238,7 @@ try {
     assessment: Number(document.querySelector('#stat-assessment').textContent),
     interviewing: Number(document.querySelector('#stat-interviewing').textContent),
     offers: Number(document.querySelector('#stat-offers').textContent),
-    due: Number(document.querySelector('#nav-followup').textContent),
+    followUps: Number(document.querySelector('#nav-followup').textContent),
     closed: Number(document.querySelector('#nav-closed').textContent),
   }))()`);
   assert.deepEqual(mutuallyExclusiveCounts, {
@@ -247,7 +247,7 @@ try {
     assessment: 1,
     interviewing: 1,
     offers: 0,
-    due: 1,
+    followUps: 1,
     closed: 0,
   });
   assert.equal(
@@ -271,8 +271,8 @@ try {
   }))()`);
   assert.deepEqual(followUpFilter, {
     company: "星河科技",
-    date: "跟进 2026/08/30",
-    dueStyle: true,
+    date: "跟进 2030/09/30",
+    dueStyle: false,
     column: "followup",
     cardGrid: true,
     selected: true,

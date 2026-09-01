@@ -8,6 +8,7 @@ import {
   createApplication,
   daysSince,
   exportPayload,
+  hasScheduledFollowUp,
   inferCompanyFromUrl,
   isFollowUpDue,
   mergeApplications,
@@ -17,9 +18,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260901-2";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260901-2";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260901-2";
+} from "./model.js?v=20260901-3";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260901-3";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260901-3";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -397,7 +398,7 @@ function getFilteredApplications() {
     }
     if (filters.city !== "all" && application.city !== filters.city) return false;
     if (filters.stage !== "all" && outcomeColumn(application) !== filters.stage) return false;
-    if (filters.quick === "followup" && !isFollowUpDue(application)) return false;
+    if (filters.quick === "followup" && !hasScheduledFollowUp(application)) return false;
     if (!["all", "followup"].includes(filters.quick) && applicationCategory(application) !== filters.quick) return false;
     return true;
   }).sort((a, b) => filters.quick === "followup"
@@ -522,8 +523,8 @@ function renderSummary() {
   $("#stat-interviewing").textContent = summary.interviewing;
   $("#stat-offers").textContent = summary.offers;
   $("#nav-total").textContent = summary.total;
-  $("#nav-followup").textContent = summary.due;
-  $("#nav-followup").classList.toggle("is-alert", summary.due > 0);
+  $("#nav-followup").textContent = summary.followUps;
+  $("#nav-followup").classList.toggle("is-alert", summary.followUps > 0);
   $("#nav-ongoing").textContent = summary.ongoing;
   $("#nav-assessment").textContent = summary.assessment;
   $("#nav-interviewing").textContent = summary.interviewing;

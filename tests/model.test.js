@@ -8,6 +8,7 @@ import {
   applicationProgress,
   completeCurrentStage,
   createApplication,
+  hasScheduledFollowUp,
   inferCompanyFromUrl,
   isFollowUpDue,
   mergeApplications,
@@ -185,13 +186,15 @@ test("结束和重新开启流程都会保留当前阶段", () => {
 
 test("跟进日期在今天或之前时视为待跟进", () => {
   const today = new Date(2026, 7, 30, 9, 0, 0);
+  assert.equal(hasScheduledFollowUp({ ...sample(), nextFollowUp: "2026-08-31" }), true);
+  assert.equal(hasScheduledFollowUp({ ...sample(), nextFollowUp: "2026-08-29", status: "rejected" }), false);
   assert.equal(isFollowUpDue({ ...sample(), nextFollowUp: "2026-08-30" }, today), true);
   assert.equal(isFollowUpDue({ ...sample(), nextFollowUp: "2026-08-31" }, today), false);
   assert.equal(isFollowUpDue({ ...sample(), nextFollowUp: "2026-08-29", status: "rejected" }, today), false);
 });
 
-test("概览阶段互斥且完整覆盖所有投递", () => {
-  const ongoing = sample();
+test("概览阶段互斥且跟进筛选可与阶段交叉", () => {
+  const ongoing = sample({ nextFollowUp: "2026-09-10" });
   const assessment = moveToStage(sample({ company: "远山" }), "assessment", {}, NOW);
   const interviewing = setOutcome(
     moveToStage(sample({ company: "云帆" }), "ai-interview", {}, NOW),
@@ -214,6 +217,7 @@ test("概览阶段互斥且完整覆盖所有投递", () => {
     interviewing: 1,
     offers: 1,
     closed: 1,
+    followUps: 1,
     due: 0,
   });
   assert.equal(summary.ongoing + summary.assessment + summary.interviewing + summary.offers + summary.closed, summary.total);
