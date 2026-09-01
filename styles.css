@@ -206,6 +206,7 @@ a { color: inherit; }
 .nav-item > span:nth-child(2) { flex: 1; }
 .nav-item:hover { background: var(--surface-soft); color: var(--text); }
 .nav-item.is-active { background: var(--primary-soft); color: var(--primary); font-weight: 650; }
+.nav-item-followup.is-active { background: var(--orange-soft); color: var(--orange); }
 
 .nav-count {
   min-width: 22px;
@@ -218,6 +219,7 @@ a { color: inherit; }
 }
 
 .nav-item.is-active .nav-count { background: var(--surface); color: var(--primary); }
+.nav-item-followup.is-active .nav-count { color: var(--orange); }
 .nav-count.is-alert:not(:empty) { color: var(--red); }
 
 .sidebar-bottom {
@@ -699,6 +701,9 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
 .card-meta span { display: inline-flex; min-width: 0; align-items: center; gap: 3px; }
 .card-meta .icon { width: 13px; height: 13px; }
 .card-meta span:last-child { margin-left: auto; }
+.card-follow-up-date { flex: 0 0 auto; color: var(--text-soft); font-weight: 650; white-space: nowrap; }
+.card-follow-up-date.is-due { color: var(--orange); }
+.card-follow-up-date.is-empty { color: var(--text-faint); font-weight: 500; }
 
 .progress-track { height: 5px; margin-top: 15px; overflow: hidden; border-radius: 99px; background: var(--surface-soft); }
 .progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--stage-color, var(--primary)), color-mix(in srgb, var(--stage-color, var(--primary)) 55%, #fff)); transition: width 0.3s ease; }

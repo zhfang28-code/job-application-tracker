@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-1')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260901-1'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-2')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260901-2'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260901-1'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260901-1'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-1'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260901-2'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260901-2'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-2'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -238,6 +238,7 @@ try {
     assessment: Number(document.querySelector('#stat-assessment').textContent),
     interviewing: Number(document.querySelector('#stat-interviewing').textContent),
     offers: Number(document.querySelector('#stat-offers').textContent),
+    due: Number(document.querySelector('#nav-followup').textContent),
     closed: Number(document.querySelector('#nav-closed').textContent),
   }))()`);
   assert.deepEqual(mutuallyExclusiveCounts, {
@@ -246,6 +247,7 @@ try {
     assessment: 1,
     interviewing: 1,
     offers: 0,
+    due: 1,
     closed: 0,
   });
   assert.equal(
@@ -256,6 +258,26 @@ try {
       + mutuallyExclusiveCounts.closed,
     mutuallyExclusiveCounts.total,
   );
+
+  await evaluate(client, "document.querySelector('[data-quick-filter=\"followup\"]').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelector('.application-card')?.textContent.includes('星河科技')");
+  const followUpFilter = await evaluate(client, `(() => ({
+    company: document.querySelector('.application-card .card-title h4')?.textContent,
+    date: document.querySelector('.card-follow-up-date')?.textContent.trim(),
+    dueStyle: document.querySelector('.card-follow-up-date')?.classList.contains('is-due'),
+    column: document.querySelector('.board-column')?.dataset.stageTarget,
+    cardGrid: document.querySelector('#pipeline-board').classList.contains('is-card-grid'),
+    selected: document.querySelector('[data-quick-filter="followup"]').classList.contains('is-active'),
+  }))()`);
+  assert.deepEqual(followUpFilter, {
+    company: "星河科技",
+    date: "跟进 2026/08/30",
+    dueStyle: true,
+    column: "followup",
+    cardGrid: true,
+    selected: true,
+  });
+  await saveScreenshot(client, "follow-up-filter-desktop.png");
 
   await evaluate(client, "document.querySelector('[data-summary-filter=\"interviewing\"]').click(); true");
   await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelectorAll('.application-card').length === 1");

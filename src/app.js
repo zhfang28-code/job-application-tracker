@@ -17,9 +17,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260901-1";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260901-1";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260901-1";
+} from "./model.js?v=20260901-2";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260901-2";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260901-2";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -36,9 +36,10 @@ let filters = {
   quick: "all",
 };
 
-const QUICK_FILTERS = new Set(["all", "ongoing", "assessment", "interviewing", "offer", "closed"]);
+const QUICK_FILTERS = new Set(["all", "followup", "ongoing", "assessment", "interviewing", "offer", "closed"]);
 const QUICK_FILTER_TITLES = Object.freeze({
   all: "投递流程",
+  followup: "需要跟进的投递",
   ongoing: "进行中的投递",
   assessment: "测试阶段",
   interviewing: "面试阶段",
@@ -46,6 +47,7 @@ const QUICK_FILTER_TITLES = Object.freeze({
   closed: "已结束的投递",
 });
 const CLOSED_COLUMN = Object.freeze({ id: "closed", label: "已结束", color: "#dc5264" });
+const FOLLOW_UP_COLUMN = Object.freeze({ id: "followup", label: "需要跟进", color: "#e68a17" });
 
 const elements = {
   board: $("#pipeline-board"),
@@ -173,6 +175,7 @@ function outcomeColumn(application) {
 }
 
 function baseBoardColumns(quickFilter = filters.quick) {
+  if (quickFilter === "followup") return [FOLLOW_UP_COLUMN];
   if (quickFilter === "ongoing") return STAGES.filter((stage) => stage.id === "applied");
   if (quickFilter === "assessment") return STAGES.filter((stage) => stage.id === "assessment");
   if (quickFilter === "interviewing") {
@@ -185,7 +188,7 @@ function baseBoardColumns(quickFilter = filters.quick) {
 
 function currentBoardColumns() {
   const columns = baseBoardColumns();
-  return filters.stage === "all"
+  return filters.quick === "followup" || filters.stage === "all"
     ? columns
     : columns.filter((column) => column.id === filters.stage);
 }
@@ -394,9 +397,12 @@ function getFilteredApplications() {
     }
     if (filters.city !== "all" && application.city !== filters.city) return false;
     if (filters.stage !== "all" && outcomeColumn(application) !== filters.stage) return false;
-    if (filters.quick !== "all" && applicationCategory(application) !== filters.quick) return false;
+    if (filters.quick === "followup" && !isFollowUpDue(application)) return false;
+    if (!["all", "followup"].includes(filters.quick) && applicationCategory(application) !== filters.quick) return false;
     return true;
-  }).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  }).sort((a, b) => filters.quick === "followup"
+    ? a.nextFollowUp.localeCompare(b.nextFollowUp) || new Date(b.updatedAt) - new Date(a.updatedAt)
+    : new Date(b.updatedAt) - new Date(a.updatedAt));
 }
 
 function cardHtml(application) {
@@ -416,11 +422,17 @@ function cardHtml(application) {
   const quickButton = !closed && application.status !== "offer"
     ? `<button class="quick-progress" type="button" data-action="progress" data-id="${application.id}">${icon("arrow")}记录新进展</button>`
     : "";
+  const followUpDate = application.nextFollowUp
+    ? `跟进 ${application.nextFollowUp.replaceAll("-", "/")}`
+    : closed || application.status === "offer"
+      ? "无需跟进"
+      : "未设跟进";
+  const followUpClass = overdue ? " is-due" : application.nextFollowUp ? "" : " is-empty";
 
   return `
     <article class="application-card${overdue ? " is-overdue" : ""}${closed ? " is-closed" : ""}"
       data-open-detail="${application.id}" data-application-id="${application.id}" tabindex="0"
-      ${closed ? "" : "draggable=\"true\""} style="${stageStyle(stage.id)}">
+      ${closed || filters.quick === "followup" ? "" : "draggable=\"true\""} style="${stageStyle(stage.id)}">
       <div class="card-top">
         <span class="company-avatar" style="${avatarStyle(application.company)}">${escapeHtml(companyInitial(application.company))}</span>
         <div class="card-title"><h4>${escapeHtml(application.company)}</h4><p>${escapeHtml(application.position)}</p></div>
@@ -436,7 +448,7 @@ function cardHtml(application) {
       <div class="card-meta">
         ${application.city ? `<span>${icon("pin")}${escapeHtml(application.city)}</span>` : ""}
         <span>${icon("calendar")}${formatDate(application.appliedAt)}</span>
-        <span>${daysSince(application.appliedAt)} 天</span>
+        <span class="card-follow-up-date${followUpClass}" title="下次跟进日期">${icon("clock")}${escapeHtml(followUpDate)}</span>
       </div>
       <div class="progress-track" title="流程完成度 ${progress}%"><span style="width:${progress}%"></span></div>
       ${quickButton}
@@ -445,10 +457,12 @@ function cardHtml(application) {
 
 function renderBoard(items) {
   const columns = currentBoardColumns();
-  elements.board.classList.toggle("is-card-grid", ["ongoing", "assessment"].includes(filters.quick));
+  elements.board.classList.toggle("is-card-grid", ["followup", "ongoing", "assessment"].includes(filters.quick));
 
   elements.board.innerHTML = columns.map((column) => {
-    const cards = items.filter((application) => outcomeColumn(application) === column.id);
+    const cards = filters.quick === "followup"
+      ? items
+      : items.filter((application) => outcomeColumn(application) === column.id);
     return `
       <section class="board-column" data-stage-target="${column.id}" style="--stage-color:${column.color}" aria-labelledby="column-${column.id}">
         <header class="board-column-header">
@@ -508,6 +522,8 @@ function renderSummary() {
   $("#stat-interviewing").textContent = summary.interviewing;
   $("#stat-offers").textContent = summary.offers;
   $("#nav-total").textContent = summary.total;
+  $("#nav-followup").textContent = summary.due;
+  $("#nav-followup").classList.toggle("is-alert", summary.due > 0);
   $("#nav-ongoing").textContent = summary.ongoing;
   $("#nav-assessment").textContent = summary.assessment;
   $("#nav-interviewing").textContent = summary.interviewing;

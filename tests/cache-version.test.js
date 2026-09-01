@@ -32,6 +32,7 @@ test("新版概览所需的统计节点完整存在", async () => {
     "stat-assessment",
     "stat-interviewing",
     "stat-offers",
+    "nav-followup",
     "nav-closed",
     "open-job-link-button",
   ]) {

@@ -5,7 +5,7 @@ import {
   normalizePipeline,
   stageById,
   toIsoDate,
-} from "./model.js?v=20260901-1";
+} from "./model.js?v=20260901-2";
 
 const HEADER_ALIASES = Object.freeze({
   company: ["单位", "公司", "公司名称", "投递公司"],
