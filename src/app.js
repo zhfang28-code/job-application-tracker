@@ -20,9 +20,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260903-4";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-4";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260903-4";
+} from "./model.js?v=20260903-5";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-5";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260903-5";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -33,7 +33,8 @@ const FORM_HISTORY_FIELDS = Object.freeze({
 });
 
 let applications = loadApplications();
-let formHistory = loadFormHistory();
+let dismissedFormHistory = loadDismissedFormHistory();
+let formHistory = filterDismissedFormHistory(loadFormHistory(), dismissedFormHistory);
 let formHistoryInitialized = loadPreference("form-history-initialized", "") === "true"
   || formHistory.positions.length > 0
   || formHistory.cities.length > 0;
@@ -103,16 +104,20 @@ const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
 });
 const DEFAULT_JOB_LINK_ANALYSIS_COPY = "粘贴后可直接打开链接；公司信息只在本地分析。";
 
-function normalizeFormHistoryList(values) {
+function historyValueKey(value) {
+  return String(value ?? "").trim().toLocaleLowerCase("zh-CN");
+}
+
+function normalizeFormHistoryList(values, limit = FORM_HISTORY_LIMIT) {
   const seen = new Set();
   const normalized = [];
   for (const rawValue of Array.isArray(values) ? values : []) {
     const value = String(rawValue ?? "").trim();
-    const key = value.toLocaleLowerCase("zh-CN");
+    const key = historyValueKey(value);
     if (!value || seen.has(key)) continue;
     seen.add(key);
     normalized.push(value);
-    if (normalized.length >= FORM_HISTORY_LIMIT) break;
+    if (normalized.length >= limit) break;
   }
   return normalized;
 }
@@ -129,11 +134,41 @@ function loadFormHistory() {
   }
 }
 
-function storeFormHistory(nextHistory) {
-  const normalized = {
-    positions: normalizeFormHistoryList(nextHistory.positions),
-    cities: normalizeFormHistoryList(nextHistory.cities),
+function loadDismissedFormHistory() {
+  try {
+    const parsed = JSON.parse(loadPreference("form-history-dismissed", "{}"));
+    return {
+      positions: normalizeFormHistoryList(parsed?.positions, Number.POSITIVE_INFINITY),
+      cities: normalizeFormHistoryList(parsed?.cities, Number.POSITIVE_INFINITY),
+    };
+  } catch {
+    return { positions: [], cities: [] };
+  }
+}
+
+function filterDismissedFormHistory(nextHistory, dismissedHistory = dismissedFormHistory) {
+  const dismissedPositions = new Set(dismissedHistory.positions.map(historyValueKey));
+  const dismissedCities = new Set(dismissedHistory.cities.map(historyValueKey));
+  return {
+    positions: normalizeFormHistoryList(nextHistory.positions)
+      .filter((value) => !dismissedPositions.has(historyValueKey(value))),
+    cities: normalizeFormHistoryList(nextHistory.cities)
+      .filter((value) => !dismissedCities.has(historyValueKey(value))),
   };
+}
+
+function storeDismissedFormHistory(nextHistory) {
+  const normalized = {
+    positions: normalizeFormHistoryList(nextHistory.positions, Number.POSITIVE_INFINITY),
+    cities: normalizeFormHistoryList(nextHistory.cities, Number.POSITIVE_INFINITY),
+  };
+  if (JSON.stringify(normalized) === JSON.stringify(dismissedFormHistory)) return;
+  dismissedFormHistory = normalized;
+  savePreference("form-history-dismissed", JSON.stringify(dismissedFormHistory));
+}
+
+function storeFormHistory(nextHistory) {
+  const normalized = filterDismissedFormHistory(nextHistory);
   if (JSON.stringify(normalized) === JSON.stringify(formHistory)) return;
   formHistory = normalized;
   savePreference("form-history", JSON.stringify(formHistory));
@@ -164,6 +199,7 @@ function rememberApplicationsInHistory(items) {
 function seedFormHistoryFromApplications() {
   if (formHistoryInitialized) {
     savePreference("form-history-initialized", "true");
+    savePreference("form-history", JSON.stringify(formHistory));
     return;
   }
   rememberApplicationsInHistory(applications);
@@ -196,12 +232,12 @@ function renderHistoryManager(kind) {
   }
 
   manager.innerHTML = `
-    <div class="history-manager-header"><strong>${config.label}历史记录</strong><small>点击内容可填写，点击 × 可删除</small></div>
+    <div class="history-manager-header"><strong>${config.label}历史记录</strong><small>点击内容可填写，点击 × 后不再保存</small></div>
     <div class="history-manager-list">
       ${values.map((value, index) => `
         <div class="history-manager-item">
           <button type="button" class="history-value-button" data-history-select="${kind}" data-history-index="${index}" title="填写：${escapeHtml(value)}">${escapeHtml(value)}</button>
-          <button type="button" class="history-delete-button" data-history-delete="${kind}" data-history-index="${index}" aria-label="删除${config.label}历史记录：${escapeHtml(value)}" title="删除这条历史记录">${icon("close")}</button>
+          <button type="button" class="history-delete-button" data-history-delete="${kind}" data-history-index="${index}" aria-label="删除${config.label}历史记录并不再保存：${escapeHtml(value)}" title="删除并不再保存">${icon("close")}</button>
         </div>`).join("")}
     </div>`;
 }
@@ -235,13 +271,17 @@ function deleteFormHistoryItem(kind, index) {
   const values = config ? formHistory[config.key] : null;
   if (!config || !values?.[index]) return;
   const removed = values[index];
+  storeDismissedFormHistory({
+    ...dismissedFormHistory,
+    [config.key]: [removed, ...dismissedFormHistory[config.key]],
+  });
   storeFormHistory({
     ...formHistory,
     [config.key]: values.filter((_, itemIndex) => itemIndex !== index),
   });
   renderFormHistoryOptions();
   if (formHistory[config.key].length) setHistoryManagerExpanded(kind, true);
-  showToast(`已删除${config.label}历史记录“${removed}”`);
+  showToast(`已删除${config.label}历史记录“${removed}”，以后不会再次自动保存`);
 }
 
 function escapeHtml(value = "") {
