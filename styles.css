@@ -866,6 +866,20 @@ dialog::backdrop {
 .field-inline-button:hover { border-color: color-mix(in srgb, var(--primary) 52%, var(--line)); background: color-mix(in srgb, var(--primary) 13%, var(--surface)); }
 .field-inline-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 18%, transparent); outline-offset: 1px; }
 .field-inline-button .icon { width: 14px; height: 14px; }
+.field-control-row > .multi-value-control { min-width: 0; flex: 1; }
+.multi-value-control { display: flex; min-height: 39px; align-items: center; flex-wrap: wrap; gap: 5px; padding: 4px 7px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); transition: border 0.18s ease, box-shadow 0.18s ease, background 0.18s ease; }
+.multi-value-control:focus-within { border-color: color-mix(in srgb, var(--primary) 58%, var(--line)); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent); }
+.multi-value-chips { display: flex; min-width: 0; flex-wrap: wrap; gap: 4px; }
+.multi-value-chips:empty { display: none; }
+.multi-value-chip { display: inline-flex; max-width: 100%; align-items: center; gap: 3px; padding: 3px 4px 3px 7px; border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--line)); border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 9px; font-weight: 650; line-height: 1.2; }
+.multi-value-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multi-value-chip button { display: grid; width: 16px; height: 16px; flex: 0 0 auto; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: currentColor; cursor: pointer; }
+.multi-value-chip button:hover { background: color-mix(in srgb, var(--primary) 14%, transparent); }
+.multi-value-chip button:focus-visible { outline: 2px solid color-mix(in srgb, var(--primary) 34%, transparent); outline-offset: 1px; }
+.multi-value-chip .icon { width: 9px; height: 9px; }
+.form-field .multi-value-control > input[data-multi-value-entry] { width: auto; min-width: 116px; height: 27px; flex: 1; padding: 0 4px; border: 0; border-radius: 5px; background: transparent; box-shadow: none; }
+.form-field .multi-value-control > input[data-multi-value-entry]:focus { border: 0; background: transparent; box-shadow: none; }
+.multi-value-hint { color: var(--text-faint); font-size: 8px; font-weight: 450; line-height: 1.4; }
 .custom-option-toggle { min-width: 82px; padding-inline: 10px; }
 .custom-option-panel { display: grid; gap: 7px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: var(--shadow-sm); }
 .custom-option-add-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
@@ -878,7 +892,11 @@ dialog::backdrop {
 .custom-option-item { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 5px; }
 .custom-option-select,
 .custom-option-delete { border: 1px solid var(--line); border-radius: 7px; background: var(--surface-soft); cursor: pointer; transition: 0.16s ease; }
-.custom-option-select { min-width: 0; padding: 6px 8px; overflow: hidden; color: var(--text-soft); font-size: 10px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.custom-option-select { display: flex; min-width: 0; align-items: center; gap: 6px; padding: 6px 8px; overflow: hidden; color: var(--text-soft); font-size: 10px; text-align: left; }
+.custom-option-select > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-option-check { display: grid; width: 14px; height: 14px; flex: 0 0 auto; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: transparent; font-size: 9px; font-weight: 800; }
+.custom-option-select.is-selected { border-color: color-mix(in srgb, var(--primary) 38%, var(--line)); background: var(--primary-soft); color: var(--primary); }
+.custom-option-select.is-selected .custom-option-check { border-color: var(--primary); background: var(--primary); color: white; }
 .custom-option-select:hover { border-color: color-mix(in srgb, var(--primary) 38%, var(--line)); background: var(--primary-soft); color: var(--primary); }
 .custom-option-delete { display: grid; width: 28px; height: 28px; place-items: center; color: var(--text-faint); }
 .custom-option-delete:hover { border-color: color-mix(in srgb, var(--red) 34%, var(--line)); background: var(--red-soft); color: var(--red); }

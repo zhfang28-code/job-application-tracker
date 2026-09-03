@@ -35,9 +35,11 @@ test("新版概览所需的统计节点完整存在", async () => {
     "nav-followup",
     "nav-closed",
     "open-job-link-button",
+    "position-input",
     "position-custom-options",
     "position-custom-option-panel",
     "position-custom-option-list",
+    "city-input",
     "city-custom-options",
     "city-custom-option-panel",
     "city-custom-option-list",
@@ -53,4 +55,8 @@ test("新版概览所需的统计节点完整存在", async () => {
   ]) {
     assert.doesNotMatch(html, new RegExp(`id="${retiredId}"`));
   }
+  assert.match(html, /id="application-form" autocomplete="off"/);
+  assert.match(html, /name="company" required maxlength="80" autocomplete="off"/);
+  assert.match(html, /data-multi-value-entry="position"/);
+  assert.match(html, /data-multi-value-entry="city"/);
 });

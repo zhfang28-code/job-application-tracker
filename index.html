@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20260903-7" />
+    <link rel="stylesheet" href="./styles.css?v=20260903-8" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -242,7 +242,7 @@
     </div>
 
     <dialog class="modal application-modal" id="application-dialog">
-      <form method="dialog" class="modal-card" id="application-form">
+      <form method="dialog" class="modal-card" id="application-form" autocomplete="off">
         <header class="modal-header">
           <div><p class="section-kicker">APPLICATION</p><h2 id="application-dialog-title">新建投递</h2><p>先记录基本信息，流程可按公司自由增减。</p></div>
           <button class="icon-button modal-close" type="button" data-close-dialog="application-dialog" aria-label="关闭"><svg class="icon"><use href="#icon-close"></use></svg></button>
@@ -261,36 +261,46 @@
                 </div>
                 <small class="field-hint" id="job-link-analysis-status" aria-live="polite">粘贴后可直接打开链接；公司信息只在本地分析。</small>
               </div>
-              <label class="form-field"><span>公司名称 *</span><input name="company" required maxlength="80" autocomplete="organization" placeholder="粘贴链接自动识别，或手动输入" /></label>
+              <label class="form-field"><span>公司名称 *</span><input name="company" required maxlength="80" autocomplete="off" placeholder="粘贴链接自动识别，或手动输入" /></label>
               <div class="form-field custom-option-field">
                 <label for="position-input">岗位名称 *</label>
                 <div class="field-control-row">
-                  <input id="position-input" name="position" required maxlength="100" list="position-custom-options" autocomplete="off" placeholder="输入岗位，或选择手动选项" />
+                  <div class="multi-value-control" data-multi-value-control="position">
+                    <div class="multi-value-chips" data-multi-value-chips="position"></div>
+                    <input id="position-input" type="text" data-multi-value-entry="position" maxlength="800" list="position-custom-options" autocomplete="off" placeholder="输入岗位后按 Enter" aria-describedby="position-multi-value-hint" />
+                    <input type="hidden" name="position" />
+                  </div>
                   <button class="field-inline-button custom-option-toggle" type="button" data-custom-option-toggle="position" aria-controls="position-custom-option-panel" aria-expanded="false">设置选项</button>
                 </div>
                 <datalist id="position-custom-options"></datalist>
+                <small class="multi-value-hint" id="position-multi-value-hint">可添加多个岗位；按 Enter 确认，点击已选标签的 × 可移除。</small>
                 <div class="custom-option-panel is-hidden" id="position-custom-option-panel" aria-label="岗位手动选项设置">
                   <div class="custom-option-add-row">
                     <input type="text" data-custom-option-entry="position" maxlength="800" autocomplete="off" placeholder="多个岗位用逗号分隔" aria-label="批量添加岗位选项" />
                     <button type="button" class="custom-option-add-button" data-custom-option-add="position">批量添加</button>
                   </div>
-                  <small>仅保存你手动添加的选项；点击选项可填写，点击 × 可删除。</small>
+                  <small>仅保存你手动添加的选项；点击可选择或取消，点击右侧 × 可删除候选项。</small>
                   <div class="custom-option-list" id="position-custom-option-list" aria-live="polite"></div>
                 </div>
               </div>
               <div class="form-field custom-option-field">
                 <label for="city-input">城市</label>
                 <div class="field-control-row">
-                  <input id="city-input" name="city" maxlength="40" list="city-custom-options" autocomplete="off" placeholder="输入城市，或选择手动选项" />
+                  <div class="multi-value-control" data-multi-value-control="city">
+                    <div class="multi-value-chips" data-multi-value-chips="city"></div>
+                    <input id="city-input" type="text" data-multi-value-entry="city" maxlength="500" list="city-custom-options" autocomplete="off" placeholder="输入城市后按 Enter" aria-describedby="city-multi-value-hint" />
+                    <input type="hidden" name="city" />
+                  </div>
                   <button class="field-inline-button custom-option-toggle" type="button" data-custom-option-toggle="city" aria-controls="city-custom-option-panel" aria-expanded="false">设置选项</button>
                 </div>
                 <datalist id="city-custom-options"></datalist>
+                <small class="multi-value-hint" id="city-multi-value-hint">可添加多个城市；按 Enter 确认，点击已选标签的 × 可移除。</small>
                 <div class="custom-option-panel is-hidden" id="city-custom-option-panel" aria-label="城市手动选项设置">
                   <div class="custom-option-add-row">
                     <input type="text" data-custom-option-entry="city" maxlength="500" autocomplete="off" placeholder="多个城市用逗号分隔" aria-label="批量添加城市选项" />
                     <button type="button" class="custom-option-add-button" data-custom-option-add="city">批量添加</button>
                   </div>
-                  <small>仅保存你手动添加的选项；点击选项可填写，点击 × 可删除。</small>
+                  <small>仅保存你手动添加的选项；点击可选择或取消，点击右侧 × 可删除候选项。</small>
                   <div class="custom-option-list" id="city-custom-option-list" aria-live="polite"></div>
                 </div>
               </div>
@@ -406,11 +416,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20260903-7", { updateViaCache: "none" })
+          .register("./sw.js?v=20260903-8", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20260903-7"></script>
+    <script type="module" src="./src/app.js?v=20260903-8"></script>
   </body>
 </html>

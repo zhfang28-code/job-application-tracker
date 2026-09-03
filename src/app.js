@@ -20,13 +20,14 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260903-7";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-7";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260903-7";
+} from "./model.js?v=20260903-8";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-8";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260903-8";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const CUSTOM_FORM_OPTION_LIMIT = 120;
+const MULTI_VALUE_LIMIT = 20;
 const CUSTOM_FORM_OPTION_FIELDS = Object.freeze({
   position: { key: "positions", label: "岗位", inputName: "position", maxLength: 100 },
   city: { key: "cities", label: "城市", inputName: "city", maxLength: 40 },
@@ -145,9 +146,123 @@ function parseCustomOptionEntries(value) {
     .filter(Boolean);
 }
 
+function normalizeMultiValueList(values, maxLength) {
+  const seen = new Set();
+  const normalized = [];
+  for (const rawValue of Array.isArray(values) ? values : []) {
+    const value = String(rawValue ?? "").trim();
+    const key = customOptionKey(value);
+    if (!value || value.length > maxLength || seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(value);
+    if (normalized.length >= MULTI_VALUE_LIMIT) break;
+  }
+  return normalized;
+}
+
+function splitMultiValueEntries(value) {
+  return String(value ?? "")
+    .split(/[\r\n,，;；、]+|(?<!\+)\+(?!\+)/u)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseMultiValueEntries(value, maxLength) {
+  return normalizeMultiValueList(splitMultiValueEntries(value), maxLength);
+}
+
+function selectedMultiValues(kind) {
+  const config = CUSTOM_FORM_OPTION_FIELDS[kind];
+  if (!config) return [];
+  return parseMultiValueEntries(
+    elements.applicationForm.elements[config.inputName].value,
+    config.maxLength,
+  );
+}
+
+function renderMultiValueField(kind) {
+  const config = CUSTOM_FORM_OPTION_FIELDS[kind];
+  if (!config) return;
+  const values = selectedMultiValues(kind);
+  const chips = $(`[data-multi-value-chips="${kind}"]`);
+  chips.innerHTML = values.map((value, index) => `
+    <span class="multi-value-chip">
+      <span title="${escapeHtml(value)}">${escapeHtml(value)}</span>
+      <button type="button" data-multi-value-remove="${kind}" data-multi-value-index="${index}" aria-label="移除${config.label}：${escapeHtml(value)}">${icon("close")}</button>
+    </span>`).join("");
+
+  const selectedKeys = new Set(values.map(customOptionKey));
+  $$(`[data-custom-option-select="${kind}"]`).forEach((button) => {
+    const option = customFormOptions[config.key]?.[Number(button.dataset.customOptionIndex)];
+    const selected = selectedKeys.has(customOptionKey(option));
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+}
+
+function setSelectedMultiValues(kind, values, { clearEntry = false } = {}) {
+  const config = CUSTOM_FORM_OPTION_FIELDS[kind];
+  if (!config) return;
+  const normalized = normalizeMultiValueList(values, config.maxLength);
+  elements.applicationForm.elements[config.inputName].value = normalized.join(" + ");
+  const entry = $(`[data-multi-value-entry="${kind}"]`);
+  if (clearEntry) entry.value = "";
+  entry.setCustomValidity("");
+  renderMultiValueField(kind);
+}
+
+function commitMultiValueEntry(kind, { announce = false } = {}) {
+  const config = CUSTOM_FORM_OPTION_FIELDS[kind];
+  if (!config) return false;
+  const entry = $(`[data-multi-value-entry="${kind}"]`);
+  const rawValue = entry.value.trim();
+  if (!rawValue) {
+    entry.setCustomValidity("");
+    return true;
+  }
+
+  const rawEntries = splitMultiValueEntries(rawValue);
+  const tooLong = rawEntries.filter((value) => value.length > config.maxLength);
+  if (!rawEntries.length || tooLong.length) {
+    const message = `每个${config.label}不能超过 ${config.maxLength} 个字符`;
+    entry.setCustomValidity(message);
+    if (announce) {
+      entry.reportValidity();
+      showToast(message, "error");
+    }
+    return false;
+  }
+
+  const previous = selectedMultiValues(kind);
+  const next = normalizeMultiValueList([...previous, ...rawEntries], config.maxLength);
+  if (next.length === previous.length && previous.length >= MULTI_VALUE_LIMIT) {
+    const message = `每条投递最多添加 ${MULTI_VALUE_LIMIT} 个${config.label}`;
+    entry.setCustomValidity(message);
+    if (announce) {
+      entry.reportValidity();
+      showToast(message, "error");
+    }
+    return false;
+  }
+
+  const addedCount = next.length - previous.length;
+  setSelectedMultiValues(kind, next, { clearEntry: true });
+  if (announce && addedCount) showToast(`已添加 ${addedCount} 个${config.label}`);
+  return true;
+}
+
+function removeSelectedMultiValue(kind, index) {
+  const values = selectedMultiValues(kind);
+  if (!values[index]) return;
+  values.splice(index, 1);
+  setSelectedMultiValues(kind, values);
+  $(`[data-multi-value-entry="${kind}"]`)?.focus();
+}
+
 function renderCustomFormOptions() {
   for (const [kind, config] of Object.entries(CUSTOM_FORM_OPTION_FIELDS)) {
     const options = customFormOptions[config.key];
+    const selectedKeys = new Set(selectedMultiValues(kind).map(customOptionKey));
     $(`#${kind}-custom-options`).innerHTML = options
       .map((value) => `<option value="${escapeHtml(value)}"></option>`)
       .join("");
@@ -155,12 +270,16 @@ function renderCustomFormOptions() {
     toggle.textContent = options.length ? `设置选项 (${options.length})` : "设置选项";
     const list = $(`#${kind}-custom-option-list`);
     list.innerHTML = options.length
-      ? options.map((value, index) => `
+      ? options.map((value, index) => {
+        const selected = selectedKeys.has(customOptionKey(value));
+        return `
         <div class="custom-option-item">
-          <button type="button" class="custom-option-select" data-custom-option-select="${kind}" data-custom-option-index="${index}" title="填写：${escapeHtml(value)}">${escapeHtml(value)}</button>
+          <button type="button" class="custom-option-select${selected ? " is-selected" : ""}" data-custom-option-select="${kind}" data-custom-option-index="${index}" aria-pressed="${selected}" title="${selected ? "取消选择" : "选择"}：${escapeHtml(value)}"><span class="custom-option-check">✓</span><span>${escapeHtml(value)}</span></button>
           <button type="button" class="custom-option-delete" data-custom-option-delete="${kind}" data-custom-option-index="${index}" aria-label="删除${config.label}选项：${escapeHtml(value)}" title="删除这个选项">${icon("close")}</button>
-        </div>`).join("")
+        </div>`;
+      }).join("")
       : `<p class="custom-option-empty">暂无手动添加的${config.label}选项</p>`;
+    renderMultiValueField(kind);
   }
 }
 
@@ -211,11 +330,15 @@ function selectCustomFormOption(kind, index) {
   const config = CUSTOM_FORM_OPTION_FIELDS[kind];
   const value = config ? customFormOptions[config.key]?.[index] : "";
   if (!config || !value) return;
-  const input = elements.applicationForm.elements[config.inputName];
-  input.value = value;
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  setCustomOptionPanelExpanded(kind, false);
-  input.focus();
+  const values = selectedMultiValues(kind);
+  const selectedIndex = values.findIndex((item) => customOptionKey(item) === customOptionKey(value));
+  if (selectedIndex >= 0) {
+    values.splice(selectedIndex, 1);
+  } else {
+    values.push(value);
+  }
+  setSelectedMultiValues(kind, values);
+  setCustomOptionPanelExpanded(kind, true);
 }
 
 function deleteCustomFormOption(kind, index) {
@@ -493,8 +616,8 @@ function applicationFormPayload(form) {
 
 function openApplicationForm(application = null) {
   elements.applicationForm.reset();
-  renderCustomFormOptions();
   for (const kind of Object.keys(CUSTOM_FORM_OPTION_FIELDS)) {
+    $(`[data-multi-value-entry="${kind}"]`).setCustomValidity("");
     setCustomOptionPanelExpanded(kind, false);
   }
   const title = $("#application-dialog-title");
@@ -519,6 +642,7 @@ function openApplicationForm(application = null) {
     elements.applicationForm.elements.appliedAt.value = formatDateInput(application.appliedAt);
     elements.applicationForm.elements.tags.value = application.tags.join("，");
   }
+  renderCustomFormOptions();
   updateOpenJobLinkButton();
   elements.applicationDialog.showModal();
   window.setTimeout(() => elements.applicationForm.elements.company.focus(), 50);
@@ -540,7 +664,14 @@ function getFilteredApplications() {
       ].join(" ").toLocaleLowerCase("zh-CN");
       if (!haystack.includes(search)) return false;
     }
-    if (filters.city !== "all" && application.city !== filters.city) return false;
+    if (filters.city !== "all") {
+      const selectedCityKey = customOptionKey(filters.city);
+      const applicationCities = parseMultiValueEntries(
+        application.city,
+        CUSTOM_FORM_OPTION_FIELDS.city.maxLength,
+      );
+      if (!applicationCities.some((city) => customOptionKey(city) === selectedCityKey)) return false;
+    }
     if (filters.stage !== "all" && outcomeColumn(application) !== filters.stage) return false;
     if (filters.quick === "followup" && !hasScheduledFollowUp(application)) return false;
     if (!["all", "followup"].includes(filters.quick) && applicationCategory(application) !== filters.quick) return false;
@@ -647,7 +778,13 @@ function renderList(items) {
 }
 
 function renderFilters() {
-  const cities = [...new Set(applications.map((app) => app.city).filter(Boolean))]
+  const citiesByKey = new Map();
+  for (const application of applications) {
+    for (const city of parseMultiValueEntries(application.city, CUSTOM_FORM_OPTION_FIELDS.city.maxLength)) {
+      if (!citiesByKey.has(customOptionKey(city))) citiesByKey.set(customOptionKey(city), city);
+    }
+  }
+  const cities = [...citiesByKey.values()]
     .sort((a, b) => a.localeCompare(b, "zh-CN"));
   const currentCity = filters.city;
   elements.cityFilter.innerHTML = `<option value="all">全部城市</option>${cities.map((city) => `<option value="${escapeHtml(city)}">${escapeHtml(city)}</option>`).join("")}`;
@@ -1006,7 +1143,20 @@ function setupEventListeners() {
       delete field.dataset.inferredCompany;
     }
   });
+  for (const kind of Object.keys(CUSTOM_FORM_OPTION_FIELDS)) {
+    const entry = $(`[data-multi-value-entry="${kind}"]`);
+    entry.addEventListener("input", () => entry.setCustomValidity(""));
+    entry.addEventListener("change", () => commitMultiValueEntry(kind));
+  }
   elements.applicationForm.addEventListener("click", (event) => {
+    const removeButton = event.target.closest("[data-multi-value-remove]");
+    if (removeButton) {
+      removeSelectedMultiValue(
+        removeButton.dataset.multiValueRemove,
+        Number(removeButton.dataset.multiValueIndex),
+      );
+      return;
+    }
     const addButton = event.target.closest("[data-custom-option-add]");
     if (addButton) {
       addCustomFormOptions(addButton.dataset.customOptionAdd);
@@ -1037,8 +1187,15 @@ function setupEventListeners() {
     }
   });
   elements.applicationForm.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.isComposing) return;
+    const multiValueEntry = event.target.closest("[data-multi-value-entry]");
+    if (multiValueEntry) {
+      event.preventDefault();
+      commitMultiValueEntry(multiValueEntry.dataset.multiValueEntry, { announce: true });
+      return;
+    }
     const entry = event.target.closest("[data-custom-option-entry]");
-    if (!entry || event.key !== "Enter" || event.isComposing) return;
+    if (!entry) return;
     event.preventDefault();
     addCustomFormOptions(entry.dataset.customOptionEntry);
   });
@@ -1054,6 +1211,14 @@ function setupEventListeners() {
 
   elements.applicationForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    let multiValuesValid = true;
+    for (const kind of Object.keys(CUSTOM_FORM_OPTION_FIELDS)) {
+      if (!commitMultiValueEntry(kind)) multiValuesValid = false;
+    }
+    const positionEntry = $('[data-multi-value-entry="position"]');
+    if (multiValuesValid) {
+      positionEntry.setCustomValidity(selectedMultiValues("position").length ? "" : "请至少添加一个岗位");
+    }
     if (!elements.applicationForm.reportValidity()) return;
     const payload = applicationFormPayload(elements.applicationForm);
     const applicationId = formValue(elements.applicationForm, "applicationId");

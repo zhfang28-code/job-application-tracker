@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-7')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-7'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-8')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-8'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-7'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-7'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-7'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-8'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-8'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-8'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -161,10 +161,26 @@ try {
     stored: ["前端开发工程师", "机械工程师", "工艺工程师"],
   });
   await evaluate(client, "document.querySelector('[data-custom-option-select=\"position\"][data-custom-option-index=\"1\"]').click(); true");
-  assert.equal(await evaluate(client, "document.querySelector('#application-form').elements.position.value"), "机械工程师");
+  assert.deepEqual(await evaluate(client, `(() => ({
+    value: document.querySelector('#application-form').elements.position.value,
+    chips: [...document.querySelectorAll('[data-multi-value-chips="position"] .multi-value-chip > span')].map((chip) => chip.textContent),
+  }))()`), { value: "机械工程师", chips: ["机械工程师"] });
+
+  await evaluate(client, "document.querySelector('[data-custom-option-select=\"position\"][data-custom-option-index=\"0\"]').click(); true");
+  assert.deepEqual(await evaluate(client, `(() => ({
+    value: document.querySelector('#application-form').elements.position.value,
+    selectedOptions: [...document.querySelectorAll('[data-custom-option-select="position"].is-selected')].map((button) => button.textContent.trim()),
+  }))()`), {
+    value: "机械工程师 + 前端开发工程师",
+    selectedOptions: ["✓前端开发工程师", "✓机械工程师"],
+  });
+
+  await evaluate(client, "document.querySelector('[data-multi-value-remove=\"position\"][data-multi-value-index=\"0\"]').click(); true");
+  assert.equal(await evaluate(client, "document.querySelector('#application-form').elements.position.value"), "前端开发工程师");
+  await evaluate(client, "document.querySelector('[data-custom-option-select=\"position\"][data-custom-option-index=\"1\"]').click(); true");
+  assert.equal(await evaluate(client, "document.querySelector('#application-form').elements.position.value"), "前端开发工程师 + 机械工程师");
 
   await evaluate(client, `(() => {
-    document.querySelector('[data-custom-option-toggle="position"]').click();
     document.querySelector('[data-custom-option-delete="position"][data-custom-option-index="2"]').click();
     return true;
   })()`);
@@ -172,7 +188,7 @@ try {
   assert.deepEqual(await evaluate(client, `(() => ({
     options: [...document.querySelectorAll('#position-custom-options option')].map((option) => option.value),
     selectedValue: document.querySelector('#application-form').elements.position.value,
-  }))()`), { options: ["前端开发工程师", "机械工程师"], selectedValue: "机械工程师" });
+  }))()`), { options: ["前端开发工程师", "机械工程师"], selectedValue: "前端开发工程师 + 机械工程师" });
 
   await evaluate(client, `(() => {
     document.querySelector('[data-custom-option-toggle="city"]').click();
@@ -184,19 +200,25 @@ try {
   await sleep(250);
   await saveScreenshot(client, "application-custom-options-desktop.png");
   await evaluate(client, "document.querySelector('[data-custom-option-select=\"city\"][data-custom-option-index=\"0\"]').click(); true");
+  await evaluate(client, "document.querySelector('[data-custom-option-select=\"city\"][data-custom-option-index=\"1\"]').click(); true");
   assert.deepEqual(await evaluate(client, `(() => ({
     city: document.querySelector('#application-form').elements.city.value,
+    chips: [...document.querySelectorAll('[data-multi-value-chips="city"] .multi-value-chip > span')].map((chip) => chip.textContent),
     stored: JSON.parse(localStorage.getItem('jobtrail.preference.custom-form-options')),
   }))()`), {
-    city: "上海",
+    city: "上海 + 北京",
+    chips: ["上海", "北京"],
     stored: { positions: ["前端开发工程师", "机械工程师"], cities: ["上海", "北京", "深圳"] },
   });
 
   await evaluate(client, `(() => {
     const form = document.querySelector('#application-form');
     if (form.elements.source || form.elements.contact) throw new Error('Removed fields are still present');
-    if (form.elements.city.value !== '上海') throw new Error('Custom city selection failed');
-    form.elements.position.value = '临时前端岗位';
+    if (form.elements.city.value !== '上海 + 北京') throw new Error('Multiple city selection failed');
+    const positionEntry = document.querySelector('[data-multi-value-entry="position"]');
+    positionEntry.value = '临时前端岗位';
+    positionEntry.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    if (form.elements.position.value !== '前端开发工程师 + 机械工程师 + 临时前端岗位') throw new Error('Typed position was not appended');
     form.elements.salary.value = '25k–35k · 14薪';
     form.elements.jobUrl.value = 'https://jobs.example.com/frontend?companyName=%E6%98%9F%E6%B2%B3%E7%A7%91%E6%8A%80';
     form.elements.jobUrl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -231,24 +253,36 @@ try {
   await waitFor(client, "document.querySelector('#application-dialog').open");
   const manualOptionFields = await evaluate(client, `(() => {
     const form = document.querySelector('#application-form');
+    const positionInput = document.querySelector('#position-input');
+    const cityInput = document.querySelector('#city-input');
     return {
-      positionList: form.elements.position.getAttribute('list'),
-      cityList: form.elements.city.getAttribute('list'),
-      positionAutocomplete: form.elements.position.autocomplete,
-      cityAutocomplete: form.elements.city.autocomplete,
+      formAutocomplete: form.autocomplete,
+      companyAutocomplete: form.elements.company.autocomplete,
+      companyList: form.elements.company.getAttribute('list'),
+      positionList: positionInput.getAttribute('list'),
+      cityList: cityInput.getAttribute('list'),
+      positionAutocomplete: positionInput.autocomplete,
+      cityAutocomplete: cityInput.autocomplete,
       positionOptions: [...document.querySelectorAll('#position-custom-options option')].map((option) => option.value),
       cityOptions: [...document.querySelectorAll('#city-custom-options option')].map((option) => option.value),
+      selectedPositionChips: document.querySelectorAll('[data-multi-value-chips="position"] .multi-value-chip').length,
+      selectedCityChips: document.querySelectorAll('[data-multi-value-chips="city"] .multi-value-chip').length,
       stored: JSON.parse(localStorage.getItem('jobtrail.preference.custom-form-options')),
       autoAddedTemporaryValue: [...document.querySelectorAll('#position-custom-options option')].some((option) => option.value === '临时前端岗位'),
     };
   })()`);
   assert.deepEqual(manualOptionFields, {
+    formAutocomplete: "off",
+    companyAutocomplete: "off",
+    companyList: null,
     positionList: "position-custom-options",
     cityList: "city-custom-options",
     positionAutocomplete: "off",
     cityAutocomplete: "off",
     positionOptions: ["前端开发工程师", "机械工程师"],
     cityOptions: ["上海", "北京", "深圳"],
+    selectedPositionChips: 0,
+    selectedCityChips: 0,
     stored: { positions: ["前端开发工程师", "机械工程师"], cities: ["上海", "北京", "深圳"] },
     autoAddedTemporaryValue: false,
   });
@@ -263,16 +297,41 @@ try {
       currentStageId: app.currentStageId,
       timelineLength: app.timeline.length,
       position: app.position,
+      city: app.city,
+      cityFilterOptions: [...document.querySelectorAll('#city-filter option')].map((option) => option.textContent),
       cardCompleted: document.querySelector('.completed-stage-tag')?.textContent.trim(),
     };
   })()`);
   assert.deepEqual(defaultAppliedState, {
     currentStageId: "applied",
     timelineLength: 1,
-    position: "临时前端岗位",
+    position: "前端开发工程师 + 机械工程师 + 临时前端岗位",
+    city: "上海 + 北京",
+    cityFilterOptions: ["全部城市", "北京", "上海"],
     cardCompleted: "已完成",
   });
   await saveScreenshot(client, "default-applied-card-desktop.png");
+
+  await evaluate(client, "document.querySelector('.application-card').click(); true");
+  await waitFor(client, "document.querySelector('#detail-dialog').open");
+  await evaluate(client, "document.querySelector('[data-detail-action=\"edit\"]').click(); true");
+  await waitFor(client, "document.querySelector('#application-dialog').open && document.querySelector('#application-dialog-title').textContent === '编辑投递'");
+  assert.deepEqual(await evaluate(client, `(() => ({
+    position: document.querySelector('#application-form').elements.position.value,
+    city: document.querySelector('#application-form').elements.city.value,
+    positionChips: [...document.querySelectorAll('[data-multi-value-chips="position"] .multi-value-chip > span')].map((chip) => chip.textContent),
+    cityChips: [...document.querySelectorAll('[data-multi-value-chips="city"] .multi-value-chip > span')].map((chip) => chip.textContent),
+  }))()`), {
+    position: "前端开发工程师 + 机械工程师 + 临时前端岗位",
+    city: "上海 + 北京",
+    positionChips: ["前端开发工程师", "机械工程师", "临时前端岗位"],
+    cityChips: ["上海", "北京"],
+  });
+  await evaluate(client, `(() => {
+    document.querySelector('#application-dialog [data-close-dialog="application-dialog"]').click();
+    document.querySelector('#detail-dialog [data-close-dialog="detail-dialog"]').click();
+    return true;
+  })()`);
 
   await evaluate(client, "document.querySelector('[data-action=\"progress\"]').click(); true");
   await waitFor(client, "document.querySelector('#progress-dialog').open");
@@ -620,7 +679,7 @@ try {
   await saveScreenshot(client, "legacy-talent-pool-migration-desktop.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: version upgrade → manual form options → stage completion → exclusive filters → talent-pool migration → desktop render");
+  console.log("Browser smoke test passed: version upgrade → multi-value fields → no company history → stage completion → exclusive filters → talent-pool migration → desktop render");
 } finally {
   client.close();
 }
