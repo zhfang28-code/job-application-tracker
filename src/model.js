@@ -471,6 +471,7 @@ export function completeCurrentStage(application, details = {}, now = new Date()
   if (TERMINAL_STATUSES.has(app.status)) return app;
 
   const timestamp = toIsoDate(details.at ?? now);
+  const currentStageCompleted = isCurrentStageCompleted(app);
   let pipeline = [...app.pipeline];
   const currentIndex = pipeline.indexOf(app.currentStageId);
   const requestedNextStageId = cleanText(details.nextStageId);
@@ -500,7 +501,7 @@ export function completeCurrentStage(application, details = {}, now = new Date()
     }
   }
   const timeline = [...app.timeline];
-  if (!isCurrentStageCompleted(app)) {
+  if (!currentStageCompleted) {
     timeline.push({
       id: makeId("event"),
       stageId: app.currentStageId,
@@ -527,7 +528,7 @@ export function completeCurrentStage(application, details = {}, now = new Date()
     stageId: nextStageId,
     type: "entered",
     at: timestamp,
-    note: cleanText(details.nextNote),
+    note: cleanText(details.nextNote, currentStageCompleted ? cleanText(details.note) : ""),
   });
 
   return {
@@ -658,16 +659,17 @@ export function moveToStage(application, targetStageId, details = {}, now = new 
 }
 
 export function completedStageIds(application) {
-  return new Set(
-    normalizeApplication(application).timeline
-      .filter((event) => event.type === "completed")
-      .map((event) => event.stageId),
-  );
+  const completed = new Set(["applied"]);
+  for (const event of normalizeApplication(application).timeline) {
+    if (event.type === "completed") completed.add(event.stageId);
+  }
+  return completed;
 }
 
 export function isCurrentStageCompleted(application) {
   const app = normalizeApplication(application);
   if (app.status !== "active" || app.currentStageId === "offer") return false;
+  if (app.currentStageId === "applied") return true;
 
   for (let index = app.timeline.length - 1; index >= 0; index -= 1) {
     const event = app.timeline[index];

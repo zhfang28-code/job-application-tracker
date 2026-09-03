@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-2')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-2'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-3')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-3'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-2'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-2'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-2'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-3'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-3'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-3'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -189,40 +189,21 @@ try {
   await saveScreenshot(client, "application-history-options-desktop.png");
   await evaluate(client, "document.querySelector('#application-dialog [data-close-dialog=\"application-dialog\"]').click(); true");
 
-  await evaluate(client, "document.querySelector('[data-action=\"progress\"]').click(); true");
-  await waitFor(client, "document.querySelector('#progress-dialog').open");
-  assert.deepEqual(await evaluate(client, `(() => {
-    const button = document.querySelector('#progress-complete-current-button');
-    return { label: button.textContent.trim(), disabled: button.disabled };
-  })()`), { label: "标记本环节已完成", disabled: false });
-  await sleep(250);
-  await saveScreenshot(client, "progress-desktop.png");
-  await evaluate(client, `(() => {
-    const form = document.querySelector('#progress-form');
-    form.elements.note.value = '网申已确认，直接进入一面';
-    document.querySelector('#progress-complete-current-button').click();
-    return true;
-  })()`);
-  await waitFor(client, "!document.querySelector('#progress-dialog').open && document.querySelector('.completed-stage-tag')?.textContent.includes('已完成')");
-  const appliedCompletion = await evaluate(client, `(() => {
+  const defaultAppliedState = await evaluate(client, `(() => {
     const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
     const app = payload.applications[0];
     return {
       currentStageId: app.currentStageId,
       timelineLength: app.timeline.length,
-      completionNote: app.timeline.at(-1).note,
-      nextFollowUp: app.nextFollowUp,
       cardCompleted: document.querySelector('.completed-stage-tag')?.textContent.trim(),
     };
   })()`);
-  assert.deepEqual(appliedCompletion, {
+  assert.deepEqual(defaultAppliedState, {
     currentStageId: "applied",
-    timelineLength: 2,
-    completionNote: "网申已确认，直接进入一面",
-    nextFollowUp: "2030-09-30",
+    timelineLength: 1,
     cardCompleted: "已完成",
   });
-  await saveScreenshot(client, "completed-stage-card-desktop.png");
+  await saveScreenshot(client, "default-applied-card-desktop.png");
 
   await evaluate(client, "document.querySelector('[data-action=\"progress\"]').click(); true");
   await waitFor(client, "document.querySelector('#progress-dialog').open");
@@ -230,9 +211,12 @@ try {
     const button = document.querySelector('#progress-complete-current-button');
     return { label: button.textContent.trim(), disabled: button.disabled };
   })()`), { label: "本环节已完成", disabled: true });
+  await sleep(250);
+  await saveScreenshot(client, "progress-desktop.png");
   await evaluate(client, `(() => {
     const form = document.querySelector('#progress-form');
     form.elements.nextStageId.value = 'first-interview';
+    form.elements.note.value = '网申已确认，直接进入一面';
     form.requestSubmit();
     return true;
   })()`);
@@ -241,9 +225,9 @@ try {
   const stored = await evaluate(client, `(() => {
     const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
     const app = payload.applications[0];
-    return { currentStageId: app.currentStageId, timelineLength: app.timeline.length };
+    return { currentStageId: app.currentStageId, timelineLength: app.timeline.length, nextStageNote: app.timeline.at(-1).note };
   })()`);
-  assert.deepEqual(stored, { currentStageId: "first-interview", timelineLength: 3 });
+  assert.deepEqual(stored, { currentStageId: "first-interview", timelineLength: 2, nextStageNote: "网申已确认，直接进入一面" });
 
   await evaluate(client, "document.querySelector('.application-card').click(); true");
   await waitFor(client, "document.querySelector('#detail-dialog').open && document.querySelector('#detail-content').textContent.includes('网申已确认')");
@@ -288,7 +272,7 @@ try {
       timelineLength: app.timeline.length,
     };
   })()`);
-  assert.deepEqual(completedStage, { currentStageId: "first-interview", completions: 1, timelineLength: 4 });
+  assert.deepEqual(completedStage, { currentStageId: "first-interview", completions: 1, timelineLength: 3 });
   assert.equal(await evaluate(client, "document.querySelector('.completed-stage-tag')?.textContent.trim()"), "已完成");
   await saveScreenshot(client, "detail-stage-completed-desktop.png");
   await evaluate(client, "document.querySelector('[data-close-dialog=\"detail-dialog\"]').click(); true");
@@ -322,6 +306,45 @@ try {
     assessment: { currentStageId: "assessment", email: "jobs@example.com", source: "csv" },
     ongoing: { currentStageId: "applied", email: "hr@pingchuan.cn", source: "csv" },
   });
+
+  await evaluate(client, `(() => {
+    const card = [...document.querySelectorAll('.application-card')]
+      .find((item) => item.textContent.includes('远山科技'));
+    card.querySelector('[data-action="progress"]').click();
+    return true;
+  })()`);
+  await waitFor(client, "document.querySelector('#progress-dialog').open");
+  assert.deepEqual(await evaluate(client, `(() => {
+    const button = document.querySelector('#progress-complete-current-button');
+    return { label: button.textContent.trim(), disabled: button.disabled };
+  })()`), { label: "标记本环节已完成", disabled: false });
+  await evaluate(client, `(() => {
+    const form = document.querySelector('#progress-form');
+    form.elements.note.value = '在线测评已提交';
+    document.querySelector('#progress-complete-current-button').click();
+    return true;
+  })()`);
+  await waitFor(client, `(() => {
+    if (document.querySelector('#progress-dialog').open) return false;
+    const card = [...document.querySelectorAll('.application-card')]
+      .find((item) => item.textContent.includes('远山科技'));
+    return card?.querySelector('.completed-stage-tag')?.textContent.includes('已完成');
+  })()`);
+  const assessmentCompletion = await evaluate(client, `(() => {
+    const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
+    const app = payload.applications.find((item) => item.company === '远山科技');
+    return {
+      currentStageId: app.currentStageId,
+      completionNote: app.timeline.at(-1).note,
+      completions: app.timeline.filter((event) => event.stageId === 'assessment' && event.type === 'completed').length,
+    };
+  })()`);
+  assert.deepEqual(assessmentCompletion, {
+    currentStageId: "assessment",
+    completionNote: "在线测评已提交",
+    completions: 1,
+  });
+  await saveScreenshot(client, "completed-assessment-card-desktop.png");
 
   const mutuallyExclusiveCounts = await evaluate(client, `(() => ({
     total: Number(document.querySelector('#stat-total').textContent),

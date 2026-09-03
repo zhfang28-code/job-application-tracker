@@ -7,6 +7,7 @@ import {
   applicationCategory,
   applicationProgress,
   completeCurrentStage,
+  completedStageIds,
   createApplication,
   hasScheduledFollowUp,
   inferCompanyFromUrl,
@@ -45,6 +46,8 @@ test("创建投递会规范流程并写入初始时间线", () => {
   assert.equal(application.timeline.length, 1);
   assert.equal(application.timeline[0].type, "entered");
   assert.equal(application.timeline[0].note, "创建投递记录");
+  assert.equal(completedStageIds(application).has("applied"), true);
+  assert.equal(isCurrentStageCompleted(application), true);
 });
 
 test("新建投递无需预先知道招聘流程", () => {
@@ -109,14 +112,32 @@ test("选择较后的已知环节会移除未发生的预设环节", () => {
 });
 
 test("完成阶段会自动进入公司实际存在的下一环节", () => {
-  const application = sample({ pipeline: ["applied", "ai-interview", "first-interview", "offer"] });
-  const updated = completeCurrentStage(application, { note: "网申已提交" }, NOW);
+  const application = moveToStage(
+    sample({ pipeline: ["applied", "ai-interview", "first-interview", "offer"] }),
+    "ai-interview",
+    {},
+    NOW,
+  );
+  const updated = completeCurrentStage(application, { note: "AI 面试已完成" }, NOW);
 
-  assert.equal(updated.currentStageId, "ai-interview");
+  assert.equal(updated.currentStageId, "first-interview");
   assert.equal(updated.timeline.at(-2).type, "completed");
-  assert.equal(updated.timeline.at(-2).note, "网申已提交");
+  assert.equal(updated.timeline.at(-2).note, "AI 面试已完成");
   assert.equal(updated.timeline.at(-1).type, "entered");
-  assert.equal(updated.timeline.at(-1).stageId, "ai-interview");
+  assert.equal(updated.timeline.at(-1).stageId, "first-interview");
+});
+
+test("已投递默认完成，记录公司下一步时保留备注且不重复完成", () => {
+  const application = createApplication({ company: "云帆", position: "算法工程师" }, NOW);
+  const updated = completeCurrentStage(application, {
+    nextStageId: "assessment",
+    note: "收到在线测评通知",
+  }, NOW);
+
+  assert.equal(updated.currentStageId, "assessment");
+  assert.equal(updated.timeline.filter((event) => event.stageId === "applied" && event.type === "completed").length, 0);
+  assert.equal(updated.timeline.at(-1).stageId, "assessment");
+  assert.equal(updated.timeline.at(-1).note, "收到在线测评通知");
 });
 
 test("可单独标记当前环节完成、保存跟进日期并在记录下一步时避免重复", () => {
