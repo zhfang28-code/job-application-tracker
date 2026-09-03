@@ -860,7 +860,27 @@ dialog::backdrop {
 .form-field select:focus { border-color: color-mix(in srgb, var(--primary) 58%, var(--line)); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent); }
 .form-field input::placeholder,
 .form-field textarea::placeholder { color: var(--text-faint); }
-.history-field-hint { margin-top: -1px; color: var(--text-faint); font-size: 8px; font-weight: 450; line-height: 1.35; }
+.history-field-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.history-field-hint { min-width: 0; color: var(--text-faint); font-size: 8px; font-weight: 450; line-height: 1.35; }
+.history-manage-toggle { flex: 0 0 auto; padding: 0; border: 0; background: transparent; color: var(--primary); font: inherit; font-size: 8px; font-weight: 750; cursor: pointer; }
+.history-manage-toggle:hover { text-decoration: underline; text-underline-offset: 2px; }
+.history-manage-toggle:focus-visible { outline: 2px solid color-mix(in srgb, var(--primary) 28%, transparent); outline-offset: 3px; border-radius: 3px; }
+.history-manage-toggle:disabled { color: var(--text-faint); cursor: default; text-decoration: none; }
+.history-manager { padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: var(--shadow-sm); }
+.history-manager-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.history-manager-header strong { color: var(--text); font-size: 10px; }
+.history-manager-header small { color: var(--text-faint); font-size: 8px; font-weight: 450; }
+.history-manager-list { display: grid; max-height: 150px; gap: 5px; overflow-y: auto; scrollbar-width: thin; }
+.history-manager-item { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 5px; }
+.history-value-button,
+.history-delete-button { border: 1px solid var(--line); border-radius: 7px; background: var(--surface-soft); cursor: pointer; transition: 0.16s ease; }
+.history-value-button { min-width: 0; padding: 6px 8px; overflow: hidden; color: var(--text-soft); font-size: 10px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.history-value-button:hover { border-color: color-mix(in srgb, var(--primary) 38%, var(--line)); background: var(--primary-soft); color: var(--primary); }
+.history-delete-button { display: grid; width: 28px; height: 28px; place-items: center; color: var(--text-faint); }
+.history-delete-button:hover { border-color: color-mix(in srgb, var(--red) 34%, var(--line)); background: var(--red-soft); color: var(--red); }
+.history-value-button:focus-visible,
+.history-delete-button:focus-visible { outline: 2px solid color-mix(in srgb, var(--primary) 28%, transparent); outline-offset: 1px; }
+.history-delete-button .icon { width: 12px; height: 12px; }
 .field-control-row { display: flex; align-items: stretch; gap: 8px; }
 .field-control-row input { min-width: 0; flex: 1; }
 .field-inline-button { display: inline-flex; min-width: 104px; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line)); border-radius: 9px; background: var(--primary-soft); color: var(--primary); font-size: 10px; font-weight: 700; cursor: pointer; transition: 0.17s ease; }

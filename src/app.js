@@ -20,16 +20,23 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260903-3";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-3";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260903-3";
+} from "./model.js?v=20260903-4";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-4";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260903-4";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const FORM_HISTORY_LIMIT = 80;
+const FORM_HISTORY_FIELDS = Object.freeze({
+  position: { key: "positions", label: "岗位", inputName: "position" },
+  city: { key: "cities", label: "城市", inputName: "city" },
+});
 
 let applications = loadApplications();
 let formHistory = loadFormHistory();
+let formHistoryInitialized = loadPreference("form-history-initialized", "") === "true"
+  || formHistory.positions.length > 0
+  || formHistory.cities.length > 0;
 let activeDetailId = null;
 let view = ["board", "list"].includes(loadPreference("view", "board"))
   ? loadPreference("view", "board")
@@ -132,18 +139,34 @@ function storeFormHistory(nextHistory) {
   savePreference("form-history", JSON.stringify(formHistory));
 }
 
+function markFormHistoryInitialized() {
+  if (formHistoryInitialized) return;
+  formHistoryInitialized = true;
+  savePreference("form-history-initialized", "true");
+}
+
 function rememberFormHistory({ position = "", city = "" } = {}) {
   storeFormHistory({
     positions: [position, ...formHistory.positions],
     cities: [city, ...formHistory.cities],
   });
+  markFormHistoryInitialized();
 }
 
-function syncFormHistoryFromApplications() {
+function rememberApplicationsInHistory(items) {
   storeFormHistory({
-    positions: [...formHistory.positions, ...applications.map((application) => application.position)],
-    cities: [...formHistory.cities, ...applications.map((application) => application.city)],
+    positions: [...items.map((item) => item.position), ...formHistory.positions],
+    cities: [...items.map((item) => item.city), ...formHistory.cities],
   });
+  markFormHistoryInitialized();
+}
+
+function seedFormHistoryFromApplications() {
+  if (formHistoryInitialized) {
+    savePreference("form-history-initialized", "true");
+    return;
+  }
+  rememberApplicationsInHistory(applications);
 }
 
 function renderFormHistoryOptions() {
@@ -153,6 +176,72 @@ function renderFormHistoryOptions() {
   $("#city-history-options").innerHTML = formHistory.cities
     .map((value) => `<option value="${escapeHtml(value)}"></option>`)
     .join("");
+  for (const kind of Object.keys(FORM_HISTORY_FIELDS)) renderHistoryManager(kind);
+}
+
+function renderHistoryManager(kind) {
+  const config = FORM_HISTORY_FIELDS[kind];
+  if (!config) return;
+  const values = formHistory[config.key];
+  const toggle = $(`[data-history-toggle="${kind}"]`);
+  const manager = $(`#${kind}-history-manager`);
+  toggle.disabled = values.length === 0;
+  toggle.textContent = values.length ? `管理记录 (${values.length})` : "暂无记录";
+
+  if (!values.length) {
+    manager.classList.add("is-hidden");
+    toggle.setAttribute("aria-expanded", "false");
+    manager.replaceChildren();
+    return;
+  }
+
+  manager.innerHTML = `
+    <div class="history-manager-header"><strong>${config.label}历史记录</strong><small>点击内容可填写，点击 × 可删除</small></div>
+    <div class="history-manager-list">
+      ${values.map((value, index) => `
+        <div class="history-manager-item">
+          <button type="button" class="history-value-button" data-history-select="${kind}" data-history-index="${index}" title="填写：${escapeHtml(value)}">${escapeHtml(value)}</button>
+          <button type="button" class="history-delete-button" data-history-delete="${kind}" data-history-index="${index}" aria-label="删除${config.label}历史记录：${escapeHtml(value)}" title="删除这条历史记录">${icon("close")}</button>
+        </div>`).join("")}
+    </div>`;
+}
+
+function setHistoryManagerExpanded(kind, expanded) {
+  const toggle = $(`[data-history-toggle="${kind}"]`);
+  const manager = $(`#${kind}-history-manager`);
+  if (!toggle || !manager || toggle.disabled) return;
+  for (const otherKind of Object.keys(FORM_HISTORY_FIELDS)) {
+    const otherToggle = $(`[data-history-toggle="${otherKind}"]`);
+    const otherManager = $(`#${otherKind}-history-manager`);
+    const shouldExpand = otherKind === kind && expanded;
+    otherToggle?.setAttribute("aria-expanded", String(shouldExpand));
+    otherManager?.classList.toggle("is-hidden", !shouldExpand);
+  }
+}
+
+function selectFormHistoryItem(kind, index) {
+  const config = FORM_HISTORY_FIELDS[kind];
+  const value = config ? formHistory[config.key]?.[index] : "";
+  if (!config || !value) return;
+  const input = elements.applicationForm.elements[config.inputName];
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  setHistoryManagerExpanded(kind, false);
+  input.focus();
+}
+
+function deleteFormHistoryItem(kind, index) {
+  const config = FORM_HISTORY_FIELDS[kind];
+  const values = config ? formHistory[config.key] : null;
+  if (!config || !values?.[index]) return;
+  const removed = values[index];
+  storeFormHistory({
+    ...formHistory,
+    [config.key]: values.filter((_, itemIndex) => itemIndex !== index),
+  });
+  renderFormHistoryOptions();
+  if (formHistory[config.key].length) setHistoryManagerExpanded(kind, true);
+  showToast(`已删除${config.label}历史记录“${removed}”`);
 }
 
 function escapeHtml(value = "") {
@@ -416,6 +505,10 @@ function applicationFormPayload(form) {
 
 function openApplicationForm(application = null) {
   renderFormHistoryOptions();
+  for (const kind of Object.keys(FORM_HISTORY_FIELDS)) {
+    $(`#${kind}-history-manager`).classList.add("is-hidden");
+    $(`[data-history-toggle="${kind}"]`).setAttribute("aria-expanded", "false");
+  }
   elements.applicationForm.reset();
   const title = $("#application-dialog-title");
   const submitLabel = $("#save-application-button");
@@ -651,7 +744,6 @@ function renderWorkspace() {
 }
 
 function renderAll() {
-  syncFormHistoryFromApplications();
   renderSummary();
   renderFilters();
   renderFollowUps();
@@ -927,6 +1019,25 @@ function setupEventListeners() {
       delete field.dataset.inferredCompany;
     }
   });
+  elements.applicationForm.addEventListener("click", (event) => {
+    const deleteButton = event.target.closest("[data-history-delete]");
+    if (deleteButton) {
+      deleteFormHistoryItem(deleteButton.dataset.historyDelete, Number(deleteButton.dataset.historyIndex));
+      return;
+    }
+    const selectButton = event.target.closest("[data-history-select]");
+    if (selectButton) {
+      selectFormHistoryItem(selectButton.dataset.historySelect, Number(selectButton.dataset.historyIndex));
+      return;
+    }
+    const toggle = event.target.closest("[data-history-toggle]");
+    if (toggle) {
+      setHistoryManagerExpanded(
+        toggle.dataset.historyToggle,
+        toggle.getAttribute("aria-expanded") !== "true",
+      );
+    }
+  });
 
   $$('[data-close-dialog]').forEach((button) => {
     button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog)?.close());
@@ -1132,6 +1243,7 @@ function setupEventListeners() {
       }
       const result = mergeCsvApplications(applications, parsed.records);
       applications = result.applications;
+      rememberApplicationsInHistory(parsed.records);
       const skipped = parsed.stats.skippedMissingRequired + parsed.stats.skippedDuplicates;
       persist(`CSV 导入完成：新增 ${result.stats.created}，更新 ${result.stats.updated}，跳过 ${skipped}`);
       resetFilters();
@@ -1149,6 +1261,7 @@ function setupEventListeners() {
     try {
       const imported = parseImportPayload(JSON.parse(await file.text()));
       applications = mergeApplications(applications, imported);
+      rememberApplicationsInHistory(imported);
       persist(`已导入并合并 ${imported.length} 条记录`);
       resetFilters();
     } catch (error) {
@@ -1200,6 +1313,7 @@ function setupEventListeners() {
 
 function initialize() {
   initializeTheme();
+  seedFormHistoryFromApplications();
   $("#today-label").textContent = new Intl.DateTimeFormat("zh-CN", {
     month: "long",
     day: "numeric",
