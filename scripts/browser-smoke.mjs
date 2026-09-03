@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-1')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-1'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-2')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-2'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-1'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-1'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-1'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-2'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-2'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-2'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -166,14 +166,73 @@ try {
   assert.equal(await evaluate(client, "document.querySelectorAll('.application-card').length"), 1);
   assert.equal(await evaluate(client, "document.querySelector('.application-card').textContent.includes('星河科技')"), true);
 
+  await evaluate(client, "document.querySelector('#add-application-button').click(); true");
+  await waitFor(client, "document.querySelector('#application-dialog').open");
+  const formHistory = await evaluate(client, `(() => {
+    const form = document.querySelector('#application-form');
+    const saved = JSON.parse(localStorage.getItem('jobtrail.preference.form-history'));
+    return {
+      positionList: form.elements.position.getAttribute('list'),
+      cityList: form.elements.city.getAttribute('list'),
+      positionOptions: [...document.querySelectorAll('#position-history-options option')].map((option) => option.value),
+      cityOptions: [...document.querySelectorAll('#city-history-options option')].map((option) => option.value),
+      saved,
+    };
+  })()`);
+  assert.deepEqual(formHistory, {
+    positionList: "position-history-options",
+    cityList: "city-history-options",
+    positionOptions: ["前端开发工程师"],
+    cityOptions: ["上海"],
+    saved: { positions: ["前端开发工程师"], cities: ["上海"] },
+  });
+  await saveScreenshot(client, "application-history-options-desktop.png");
+  await evaluate(client, "document.querySelector('#application-dialog [data-close-dialog=\"application-dialog\"]').click(); true");
+
   await evaluate(client, "document.querySelector('[data-action=\"progress\"]').click(); true");
   await waitFor(client, "document.querySelector('#progress-dialog').open");
+  assert.deepEqual(await evaluate(client, `(() => {
+    const button = document.querySelector('#progress-complete-current-button');
+    return { label: button.textContent.trim(), disabled: button.disabled };
+  })()`), { label: "标记本环节已完成", disabled: false });
   await sleep(250);
   await saveScreenshot(client, "progress-desktop.png");
   await evaluate(client, `(() => {
     const form = document.querySelector('#progress-form');
-    form.elements.nextStageId.value = 'first-interview';
     form.elements.note.value = '网申已确认，直接进入一面';
+    document.querySelector('#progress-complete-current-button').click();
+    return true;
+  })()`);
+  await waitFor(client, "!document.querySelector('#progress-dialog').open && document.querySelector('.completed-stage-tag')?.textContent.includes('已完成')");
+  const appliedCompletion = await evaluate(client, `(() => {
+    const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
+    const app = payload.applications[0];
+    return {
+      currentStageId: app.currentStageId,
+      timelineLength: app.timeline.length,
+      completionNote: app.timeline.at(-1).note,
+      nextFollowUp: app.nextFollowUp,
+      cardCompleted: document.querySelector('.completed-stage-tag')?.textContent.trim(),
+    };
+  })()`);
+  assert.deepEqual(appliedCompletion, {
+    currentStageId: "applied",
+    timelineLength: 2,
+    completionNote: "网申已确认，直接进入一面",
+    nextFollowUp: "2030-09-30",
+    cardCompleted: "已完成",
+  });
+  await saveScreenshot(client, "completed-stage-card-desktop.png");
+
+  await evaluate(client, "document.querySelector('[data-action=\"progress\"]').click(); true");
+  await waitFor(client, "document.querySelector('#progress-dialog').open");
+  assert.deepEqual(await evaluate(client, `(() => {
+    const button = document.querySelector('#progress-complete-current-button');
+    return { label: button.textContent.trim(), disabled: button.disabled };
+  })()`), { label: "本环节已完成", disabled: true });
+  await evaluate(client, `(() => {
+    const form = document.querySelector('#progress-form');
+    form.elements.nextStageId.value = 'first-interview';
     form.requestSubmit();
     return true;
   })()`);
@@ -230,8 +289,10 @@ try {
     };
   })()`);
   assert.deepEqual(completedStage, { currentStageId: "first-interview", completions: 1, timelineLength: 4 });
+  assert.equal(await evaluate(client, "document.querySelector('.completed-stage-tag')?.textContent.trim()"), "已完成");
   await saveScreenshot(client, "detail-stage-completed-desktop.png");
   await evaluate(client, "document.querySelector('[data-close-dialog=\"detail-dialog\"]').click(); true");
+  await saveScreenshot(client, "completed-interview-card-desktop.png");
 
   await evaluate(client, `(() => {
     window.confirm = () => true;
@@ -467,7 +528,7 @@ try {
   await saveScreenshot(client, "legacy-talent-pool-migration-desktop.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: version upgrade → exclusive filters → talent-pool migration → desktop render");
+  console.log("Browser smoke test passed: version upgrade → form history → stage completion → exclusive filters → talent-pool migration → desktop render");
 } finally {
   client.close();
 }

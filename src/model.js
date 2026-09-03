@@ -439,9 +439,9 @@ export function updateApplication(application, input, now = new Date()) {
 export function markCurrentStageCompleted(application, details = {}, now = new Date()) {
   const app = normalizeApplication(application);
   if (
-    TERMINAL_STATUSES.has(app.status)
+    app.status !== "active"
     || app.currentStageId === "offer"
-    || completedStageIds(app).has(app.currentStageId)
+    || isCurrentStageCompleted(app)
   ) {
     return app;
   }
@@ -449,6 +449,9 @@ export function markCurrentStageCompleted(application, details = {}, now = new D
   const timestamp = toIsoDate(details.at ?? now);
   return {
     ...app,
+    nextFollowUp: Object.hasOwn(details, "nextFollowUp")
+      ? cleanText(details.nextFollowUp)
+      : app.nextFollowUp,
     timeline: [
       ...app.timeline,
       {
@@ -497,7 +500,7 @@ export function completeCurrentStage(application, details = {}, now = new Date()
     }
   }
   const timeline = [...app.timeline];
-  if (!completedStageIds(app).has(app.currentStageId)) {
+  if (!isCurrentStageCompleted(app)) {
     timeline.push({
       id: makeId("event"),
       stageId: app.currentStageId,
@@ -660,6 +663,17 @@ export function completedStageIds(application) {
       .filter((event) => event.type === "completed")
       .map((event) => event.stageId),
   );
+}
+
+export function isCurrentStageCompleted(application) {
+  const app = normalizeApplication(application);
+  if (app.status !== "active" || app.currentStageId === "offer") return false;
+
+  for (let index = app.timeline.length - 1; index >= 0; index -= 1) {
+    const event = app.timeline[index];
+    if (event.stageId === app.currentStageId) return event.type === "completed";
+  }
+  return false;
 }
 
 export function applicationProgress(application) {

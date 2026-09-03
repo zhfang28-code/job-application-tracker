@@ -10,6 +10,7 @@ import {
   createApplication,
   hasScheduledFollowUp,
   inferCompanyFromUrl,
+  isCurrentStageCompleted,
   isFollowUpDue,
   markCurrentStageCompleted,
   mergeApplications,
@@ -118,9 +119,11 @@ test("完成阶段会自动进入公司实际存在的下一环节", () => {
   assert.equal(updated.timeline.at(-1).stageId, "ai-interview");
 });
 
-test("可单独标记当前环节完成并在记录下一步时避免重复", () => {
+test("可单独标记当前环节完成、保存跟进日期并在记录下一步时避免重复", () => {
   const application = moveToStage(sample(), "assessment", {}, NOW);
-  const marked = markCurrentStageCompleted(application, {}, NOW);
+  const marked = markCurrentStageCompleted(application, {
+    nextFollowUp: "2026-09-05",
+  }, NOW);
   const markedAgain = markCurrentStageCompleted(marked, {}, NOW);
   const advanced = completeCurrentStage(markedAgain, {
     nextStageId: "first-interview",
@@ -129,12 +132,27 @@ test("可单独标记当前环节完成并在记录下一步时避免重复", ()
   assert.equal(marked.currentStageId, "assessment");
   assert.equal(marked.timeline.at(-1).type, "completed");
   assert.equal(marked.timeline.at(-1).stageId, "assessment");
+  assert.equal(marked.nextFollowUp, "2026-09-05");
+  assert.equal(isCurrentStageCompleted(marked), true);
   assert.equal(markedAgain.timeline.length, marked.timeline.length);
   assert.equal(advanced.currentStageId, "first-interview");
+  assert.equal(isCurrentStageCompleted(advanced), false);
   assert.equal(
     advanced.timeline.filter((event) => event.stageId === "assessment" && event.type === "completed").length,
     1,
   );
+});
+
+test("重新开启同一环节后可以再次标记完成", () => {
+  const application = moveToStage(sample(), "assessment", {}, NOW);
+  const completed = markCurrentStageCompleted(application, {}, NOW);
+  const rejected = setOutcome(completed, "rejected", {}, NOW);
+  const reopened = setOutcome(rejected, "active", {}, NOW);
+  const completedAgain = markCurrentStageCompleted(reopened, {}, NOW);
+
+  assert.equal(isCurrentStageCompleted(reopened), false);
+  assert.equal(isCurrentStageCompleted(completedAgain), true);
+  assert.equal(completedAgain.timeline.length, reopened.timeline.length + 1);
 });
 
 test("进入 Offer 环节即标记为已收 Offer", () => {

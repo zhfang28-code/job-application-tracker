@@ -10,6 +10,7 @@ import {
   exportPayload,
   hasScheduledFollowUp,
   inferCompanyFromUrl,
+  isCurrentStageCompleted,
   isFollowUpDue,
   markCurrentStageCompleted,
   mergeApplications,
@@ -19,14 +20,16 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260903-1";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-1";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260903-1";
+} from "./model.js?v=20260903-2";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-2";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260903-2";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const FORM_HISTORY_LIMIT = 80;
 
 let applications = loadApplications();
+let formHistory = loadFormHistory();
 let activeDetailId = null;
 let view = ["board", "list"].includes(loadPreference("view", "board"))
   ? loadPreference("view", "board")
@@ -92,6 +95,65 @@ const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
   hour12: false,
 });
 const DEFAULT_JOB_LINK_ANALYSIS_COPY = "粘贴后可直接打开链接；公司信息只在本地分析。";
+
+function normalizeFormHistoryList(values) {
+  const seen = new Set();
+  const normalized = [];
+  for (const rawValue of Array.isArray(values) ? values : []) {
+    const value = String(rawValue ?? "").trim();
+    const key = value.toLocaleLowerCase("zh-CN");
+    if (!value || seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(value);
+    if (normalized.length >= FORM_HISTORY_LIMIT) break;
+  }
+  return normalized;
+}
+
+function loadFormHistory() {
+  try {
+    const parsed = JSON.parse(loadPreference("form-history", "{}"));
+    return {
+      positions: normalizeFormHistoryList(parsed?.positions),
+      cities: normalizeFormHistoryList(parsed?.cities),
+    };
+  } catch {
+    return { positions: [], cities: [] };
+  }
+}
+
+function storeFormHistory(nextHistory) {
+  const normalized = {
+    positions: normalizeFormHistoryList(nextHistory.positions),
+    cities: normalizeFormHistoryList(nextHistory.cities),
+  };
+  if (JSON.stringify(normalized) === JSON.stringify(formHistory)) return;
+  formHistory = normalized;
+  savePreference("form-history", JSON.stringify(formHistory));
+}
+
+function rememberFormHistory({ position = "", city = "" } = {}) {
+  storeFormHistory({
+    positions: [position, ...formHistory.positions],
+    cities: [city, ...formHistory.cities],
+  });
+}
+
+function syncFormHistoryFromApplications() {
+  storeFormHistory({
+    positions: [...formHistory.positions, ...applications.map((application) => application.position)],
+    cities: [...formHistory.cities, ...applications.map((application) => application.city)],
+  });
+}
+
+function renderFormHistoryOptions() {
+  $("#position-history-options").innerHTML = formHistory.positions
+    .map((value) => `<option value="${escapeHtml(value)}"></option>`)
+    .join("");
+  $("#city-history-options").innerHTML = formHistory.cities
+    .map((value) => `<option value="${escapeHtml(value)}"></option>`)
+    .join("");
+}
 
 function escapeHtml(value = "") {
   return String(value)
@@ -353,6 +415,7 @@ function applicationFormPayload(form) {
 }
 
 function openApplicationForm(application = null) {
+  renderFormHistoryOptions();
   elements.applicationForm.reset();
   const title = $("#application-dialog-title");
   const submitLabel = $("#save-application-button");
@@ -409,6 +472,7 @@ function getFilteredApplications() {
 
 function cardHtml(application) {
   const stage = stageById(application.currentStageId);
+  const currentStageCompleted = isCurrentStageCompleted(application);
   const overdue = isFollowUpDue(application);
   const closed = ["rejected", "withdrawn"].includes(application.status);
   const progress = applicationProgress(application);
@@ -442,6 +506,7 @@ function cardHtml(application) {
       </div>
       <div class="card-tags">
         <span class="tag stage-tag" style="${stageStyle(stage.id)}">${escapeHtml(stage.label)}</span>
+        ${currentStageCompleted ? `<span class="tag completed-stage-tag">${icon("check")}已完成</span>` : ""}
         ${overdue ? `<span class="tag overdue-tag">待跟进</span>` : ""}
         ${statusTag}
         ${importTag}
@@ -586,6 +651,7 @@ function renderWorkspace() {
 }
 
 function renderAll() {
+  syncFormHistoryFromApplications();
   renderSummary();
   renderFilters();
   renderFollowUps();
@@ -599,9 +665,11 @@ function routeHtml(application) {
   const skipped = new Set(application.timeline.filter((event) => event.type === "skipped").map((event) => event.stageId));
   return application.pipeline.map((stageId) => {
     const stage = stageById(stageId);
-    const isComplete = complete.has(stageId);
-    const isSkipped = skipped.has(stageId);
     const isCurrent = application.currentStageId === stageId;
+    const isComplete = isCurrent
+      ? isCurrentStageCompleted(application)
+      : complete.has(stageId);
+    const isSkipped = skipped.has(stageId);
     const classes = [
       "route-step",
       isComplete ? "is-complete" : "",
@@ -613,7 +681,7 @@ function routeHtml(application) {
       && !isComplete
       && !isSkipped
       && stageId !== "offer"
-      && !["offer", "rejected", "withdrawn"].includes(application.status);
+      && application.status === "active";
     const completionControl = isComplete
       ? `<span class="route-complete-state">${icon("check")}已完成</span>`
       : canComplete
@@ -709,11 +777,24 @@ function openDetail(applicationId) {
   if (!elements.detailDialog.open) elements.detailDialog.showModal();
 }
 
+function renderProgressCurrent(application) {
+  const stage = stageById(application.currentStageId);
+  const currentCompleted = isCurrentStageCompleted(application);
+  const completionUnavailable = application.status !== "active";
+  $("#progress-current").innerHTML = `<span class="stage-bubble" style="${stageStyle(stage.id)}">${escapeHtml(stage.shortLabel.slice(0, 2))}</span><span><strong>当前：${escapeHtml(stage.label)}</strong><small>${currentCompleted ? "本环节已完成，等待公司通知下一步" : "下一步以公司实际通知为准"}</small></span>`;
+  const completionButton = $("#progress-complete-current-button");
+  completionButton.disabled = currentCompleted || completionUnavailable;
+  completionButton.classList.toggle("is-complete", currentCompleted);
+  $("#progress-complete-current-label").textContent = currentCompleted
+    ? "本环节已完成"
+    : completionUnavailable
+      ? "流程已搁置"
+      : "标记本环节已完成";
+}
+
 function openProgress(applicationId) {
   const application = applications.find((item) => item.id === applicationId);
   if (!application || ["offer", "rejected", "withdrawn"].includes(application.status)) return;
-  const stage = stageById(application.currentStageId);
-  const currentCompleted = completedStageIds(application).has(application.currentStageId);
   const currentIndex = application.pipeline.indexOf(application.currentStageId);
   const unavailableStageIds = new Set(application.pipeline.slice(0, currentIndex + 1));
   const availableStages = STAGES.filter(
@@ -726,7 +807,7 @@ function openProgress(applicationId) {
   elements.progressForm.elements.nextStageId.innerHTML = `
     <option value="">请选择已确认的下一环节</option>
     ${availableStages.map((candidate) => `<option value="${candidate.id}">${escapeHtml(candidate.label)}</option>`).join("")}`;
-  $("#progress-current").innerHTML = `<span class="stage-bubble" style="${stageStyle(stage.id)}">${escapeHtml(stage.shortLabel.slice(0, 2))}</span><span><strong>当前：${escapeHtml(stage.label)}</strong><small>${currentCompleted ? "本环节已完成，等待公司通知下一步" : "下一步以公司实际通知为准"}</small></span>`;
+  renderProgressCurrent(application);
   $("#progress-description").textContent = "选择公司已经确认的下一环节，系统会按真实顺序补进流程。";
   $("#complete-stage-label").textContent = "保存并进入下一环节";
   elements.progressDialog.showModal();
@@ -861,6 +942,7 @@ function setupEventListeners() {
     event.preventDefault();
     if (!elements.applicationForm.reportValidity()) return;
     const payload = applicationFormPayload(elements.applicationForm);
+    rememberFormHistory(payload);
     const applicationId = formValue(elements.applicationForm, "applicationId");
     if (applicationId) {
       const existing = applications.find((application) => application.id === applicationId);
@@ -874,6 +956,22 @@ function setupEventListeners() {
       activeDetailId = created.id;
     }
     elements.applicationDialog.close();
+    renderAll();
+  });
+
+  $("#progress-complete-current-button").addEventListener("click", () => {
+    const applicationId = formValue(elements.progressForm, "applicationId");
+    const existing = applications.find((application) => application.id === applicationId);
+    if (!existing) return;
+    const updated = markCurrentStageCompleted(existing, {
+      at: formValue(elements.progressForm, "completedAt"),
+      note: formValue(elements.progressForm, "note"),
+      nextFollowUp: formValue(elements.progressForm, "nextFollowUp"),
+    });
+    if (updated.timeline.length <= existing.timeline.length) return;
+    updateApplicationInState(updated);
+    persist(`「${stageById(updated.currentStageId).label}」已标记完成`);
+    elements.progressDialog.close();
     renderAll();
   });
 

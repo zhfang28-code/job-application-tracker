@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20260903-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260903-2" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -262,8 +262,8 @@
                 <small class="field-hint" id="job-link-analysis-status" aria-live="polite">粘贴后可直接打开链接；公司信息只在本地分析。</small>
               </div>
               <label class="form-field"><span>公司名称 *</span><input name="company" required maxlength="80" autocomplete="organization" placeholder="粘贴链接自动识别，或手动输入" /></label>
-              <label class="form-field"><span>岗位名称 *</span><input name="position" required maxlength="100" placeholder="例如：前端开发工程师" /></label>
-              <label class="form-field"><span>城市</span><input name="city" maxlength="40" placeholder="例如：上海 / 远程" /></label>
+              <label class="form-field"><span>岗位名称 *</span><input name="position" required maxlength="100" list="position-history-options" autocomplete="off" placeholder="输入新岗位，或选择历史记录" aria-describedby="position-history-hint" /><datalist id="position-history-options"></datalist><small class="history-field-hint" id="position-history-hint">点击输入框可选择曾填写的岗位</small></label>
+              <label class="form-field"><span>城市</span><input name="city" maxlength="40" list="city-history-options" autocomplete="off" placeholder="输入新城市，或选择历史记录" aria-describedby="city-history-hint" /><datalist id="city-history-options"></datalist><small class="history-field-hint" id="city-history-hint">点击输入框可选择曾填写的城市</small></label>
               <label class="form-field"><span>薪资范围</span><input name="salary" maxlength="40" placeholder="例如：25k–35k · 14薪" /></label>
               <label class="form-field"><span>投递日期</span><input name="appliedAt" type="date" /></label>
               <label class="form-field"><span>下次跟进</span><input name="nextFollowUp" type="date" /></label>
@@ -327,6 +327,9 @@
           <label class="form-field" id="next-follow-up-field"><span>下次跟进</span><input name="nextFollowUp" type="date" /></label>
         </div>
         <footer class="modal-footer progress-footer">
+          <button class="button progress-complete-button" type="button" id="progress-complete-current-button">
+            <svg class="icon"><use href="#icon-check"></use></svg><span id="progress-complete-current-label">标记本环节已完成</span>
+          </button>
           <div>
             <button class="button button-ghost" type="button" data-close-dialog="progress-dialog">取消</button>
             <button class="button button-primary" type="submit"><svg class="icon"><use href="#icon-arrow"></use></svg><span id="complete-stage-label">保存并进入下一环节</span></button>
@@ -373,11 +376,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20260903-1", { updateViaCache: "none" })
+          .register("./sw.js?v=20260903-2", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20260903-1"></script>
+    <script type="module" src="./src/app.js?v=20260903-2"></script>
   </body>
 </html>

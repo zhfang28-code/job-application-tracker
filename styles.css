@@ -694,6 +694,8 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
 .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 15px; }
 .tag { max-width: 100%; padding: 3px 8px; overflow: hidden; border-radius: 6px; background: var(--surface-soft); color: var(--text-soft); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .tag.stage-tag { background: color-mix(in srgb, var(--stage-color, var(--primary)) 10%, var(--surface)); color: var(--stage-color, var(--primary)); font-weight: 650; }
+.tag.completed-stage-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--green-soft); color: var(--green); font-weight: 700; }
+.completed-stage-tag .icon { width: 11px; height: 11px; }
 .tag.overdue-tag { background: var(--orange-soft); color: var(--orange); }
 .tag.status-tag { background: var(--red-soft); color: var(--red); }
 
@@ -858,6 +860,7 @@ dialog::backdrop {
 .form-field select:focus { border-color: color-mix(in srgb, var(--primary) 58%, var(--line)); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent); }
 .form-field input::placeholder,
 .form-field textarea::placeholder { color: var(--text-faint); }
+.history-field-hint { margin-top: -1px; color: var(--text-faint); font-size: 8px; font-weight: 450; line-height: 1.35; }
 .field-control-row { display: flex; align-items: stretch; gap: 8px; }
 .field-control-row input { min-width: 0; flex: 1; }
 .field-inline-button { display: inline-flex; min-width: 104px; align-items: center; justify-content: center; gap: 6px; padding: 0 13px; border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line)); border-radius: 9px; background: var(--primary-soft); color: var(--primary); font-size: 10px; font-weight: 700; cursor: pointer; transition: 0.17s ease; }
@@ -983,8 +986,13 @@ dialog::backdrop {
 .progress-current small { margin-top: 2px; color: var(--text-faint); font-size: 9px; }
 .progress-modal .form-field > small { margin-top: 5px; color: var(--text-faint); font-size: 8px; line-height: 1.5; }
 .progress-modal .form-field + .form-field { margin-top: 13px; }
-.progress-footer { justify-content: flex-end; }
+.progress-footer { justify-content: space-between; gap: 12px; }
 .progress-footer > div { display: flex; gap: 8px; }
+.progress-complete-button { border: 1px solid color-mix(in srgb, var(--green) 34%, var(--line)); background: var(--green-soft); color: var(--green); white-space: nowrap; }
+.progress-complete-button:not(:disabled):hover { border-color: var(--green); box-shadow: 0 6px 16px color-mix(in srgb, var(--green) 15%, transparent); }
+.progress-complete-button:disabled { cursor: default; transform: none; }
+.progress-complete-button:disabled:not(.is-complete) { opacity: 0.48; }
+.progress-complete-button.is-complete { border-color: var(--green); background: var(--green); color: #fff; opacity: 1; }
 
 .outcome-options { display: grid; gap: 10px; margin-bottom: 19px; }
 .outcome-options label { cursor: pointer; }
