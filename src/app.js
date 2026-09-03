@@ -20,14 +20,20 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260903-6";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-6";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260903-6";
+} from "./model.js?v=20260903-7";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-7";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260903-7";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const CUSTOM_FORM_OPTION_LIMIT = 120;
+const CUSTOM_FORM_OPTION_FIELDS = Object.freeze({
+  position: { key: "positions", label: "岗位", inputName: "position", maxLength: 100 },
+  city: { key: "cities", label: "城市", inputName: "city", maxLength: 40 },
+});
 
 let applications = loadApplications();
+let customFormOptions = loadCustomFormOptions();
 let activeDetailId = null;
 let view = ["board", "list"].includes(loadPreference("view", "board"))
   ? loadPreference("view", "board")
@@ -93,6 +99,138 @@ const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
   hour12: false,
 });
 const DEFAULT_JOB_LINK_ANALYSIS_COPY = "粘贴后可直接打开链接；公司信息只在本地分析。";
+
+function customOptionKey(value) {
+  return String(value ?? "").trim().toLocaleLowerCase("zh-CN");
+}
+
+function normalizeCustomOptionList(values, maxLength) {
+  const seen = new Set();
+  const normalized = [];
+  for (const rawValue of Array.isArray(values) ? values : []) {
+    const value = String(rawValue ?? "").trim();
+    const key = customOptionKey(value);
+    if (!value || value.length > maxLength || seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(value);
+    if (normalized.length >= CUSTOM_FORM_OPTION_LIMIT) break;
+  }
+  return normalized;
+}
+
+function loadCustomFormOptions() {
+  try {
+    const parsed = JSON.parse(loadPreference("custom-form-options", "{}"));
+    return {
+      positions: normalizeCustomOptionList(parsed?.positions, CUSTOM_FORM_OPTION_FIELDS.position.maxLength),
+      cities: normalizeCustomOptionList(parsed?.cities, CUSTOM_FORM_OPTION_FIELDS.city.maxLength),
+    };
+  } catch {
+    return { positions: [], cities: [] };
+  }
+}
+
+function storeCustomFormOptions(nextOptions) {
+  customFormOptions = {
+    positions: normalizeCustomOptionList(nextOptions.positions, CUSTOM_FORM_OPTION_FIELDS.position.maxLength),
+    cities: normalizeCustomOptionList(nextOptions.cities, CUSTOM_FORM_OPTION_FIELDS.city.maxLength),
+  };
+  savePreference("custom-form-options", JSON.stringify(customFormOptions));
+}
+
+function parseCustomOptionEntries(value) {
+  return String(value ?? "")
+    .split(/[\r\n,，;；、]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function renderCustomFormOptions() {
+  for (const [kind, config] of Object.entries(CUSTOM_FORM_OPTION_FIELDS)) {
+    const options = customFormOptions[config.key];
+    $(`#${kind}-custom-options`).innerHTML = options
+      .map((value) => `<option value="${escapeHtml(value)}"></option>`)
+      .join("");
+    const toggle = $(`[data-custom-option-toggle="${kind}"]`);
+    toggle.textContent = options.length ? `设置选项 (${options.length})` : "设置选项";
+    const list = $(`#${kind}-custom-option-list`);
+    list.innerHTML = options.length
+      ? options.map((value, index) => `
+        <div class="custom-option-item">
+          <button type="button" class="custom-option-select" data-custom-option-select="${kind}" data-custom-option-index="${index}" title="填写：${escapeHtml(value)}">${escapeHtml(value)}</button>
+          <button type="button" class="custom-option-delete" data-custom-option-delete="${kind}" data-custom-option-index="${index}" aria-label="删除${config.label}选项：${escapeHtml(value)}" title="删除这个选项">${icon("close")}</button>
+        </div>`).join("")
+      : `<p class="custom-option-empty">暂无手动添加的${config.label}选项</p>`;
+  }
+}
+
+function setCustomOptionPanelExpanded(kind, expanded) {
+  if (!CUSTOM_FORM_OPTION_FIELDS[kind]) return;
+  for (const fieldKind of Object.keys(CUSTOM_FORM_OPTION_FIELDS)) {
+    const shouldExpand = fieldKind === kind && expanded;
+    $(`[data-custom-option-toggle="${fieldKind}"]`)?.setAttribute("aria-expanded", String(shouldExpand));
+    $(`#${fieldKind}-custom-option-panel`)?.classList.toggle("is-hidden", !shouldExpand);
+  }
+}
+
+function addCustomFormOptions(kind) {
+  const config = CUSTOM_FORM_OPTION_FIELDS[kind];
+  if (!config) return;
+  const entry = $(`[data-custom-option-entry="${kind}"]`);
+  const candidates = parseCustomOptionEntries(entry.value);
+  if (!candidates.length) {
+    showToast(`请输入要添加的${config.label}选项`, "error");
+    entry.focus();
+    return;
+  }
+  const validCandidates = candidates.filter((value) => value.length <= config.maxLength);
+  const previousOptions = customFormOptions[config.key];
+  const nextOptions = normalizeCustomOptionList(
+    [...previousOptions, ...validCandidates],
+    config.maxLength,
+  );
+  const addedCount = nextOptions.length - previousOptions.length;
+  const skippedTooLong = candidates.length - validCandidates.length;
+  if (!addedCount) {
+    const reason = skippedTooLong === candidates.length ? `每个${config.label}选项不能超过 ${config.maxLength} 个字符` : "这些选项已经存在";
+    showToast(reason, "error");
+    entry.focus();
+    return;
+  }
+  storeCustomFormOptions({
+    ...customFormOptions,
+    [config.key]: nextOptions,
+  });
+  entry.value = "";
+  renderCustomFormOptions();
+  setCustomOptionPanelExpanded(kind, true);
+  showToast(`已添加 ${addedCount} 个${config.label}选项${skippedTooLong ? `，跳过 ${skippedTooLong} 个过长内容` : ""}`);
+}
+
+function selectCustomFormOption(kind, index) {
+  const config = CUSTOM_FORM_OPTION_FIELDS[kind];
+  const value = config ? customFormOptions[config.key]?.[index] : "";
+  if (!config || !value) return;
+  const input = elements.applicationForm.elements[config.inputName];
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  setCustomOptionPanelExpanded(kind, false);
+  input.focus();
+}
+
+function deleteCustomFormOption(kind, index) {
+  const config = CUSTOM_FORM_OPTION_FIELDS[kind];
+  const options = config ? customFormOptions[config.key] : null;
+  if (!config || !options?.[index]) return;
+  const removed = options[index];
+  storeCustomFormOptions({
+    ...customFormOptions,
+    [config.key]: options.filter((_, optionIndex) => optionIndex !== index),
+  });
+  renderCustomFormOptions();
+  setCustomOptionPanelExpanded(kind, true);
+  showToast(`已删除${config.label}选项“${removed}”`);
+}
 
 function escapeHtml(value = "") {
   return String(value)
@@ -355,6 +493,10 @@ function applicationFormPayload(form) {
 
 function openApplicationForm(application = null) {
   elements.applicationForm.reset();
+  renderCustomFormOptions();
+  for (const kind of Object.keys(CUSTOM_FORM_OPTION_FIELDS)) {
+    setCustomOptionPanelExpanded(kind, false);
+  }
   const title = $("#application-dialog-title");
   const submitLabel = $("#save-application-button");
   const idField = elements.applicationForm.elements.applicationId;
@@ -863,6 +1005,42 @@ function setupEventListeners() {
     if (field.dataset.inferredCompany && field.value.trim() !== field.dataset.inferredCompany) {
       delete field.dataset.inferredCompany;
     }
+  });
+  elements.applicationForm.addEventListener("click", (event) => {
+    const addButton = event.target.closest("[data-custom-option-add]");
+    if (addButton) {
+      addCustomFormOptions(addButton.dataset.customOptionAdd);
+      return;
+    }
+    const deleteButton = event.target.closest("[data-custom-option-delete]");
+    if (deleteButton) {
+      deleteCustomFormOption(
+        deleteButton.dataset.customOptionDelete,
+        Number(deleteButton.dataset.customOptionIndex),
+      );
+      return;
+    }
+    const selectButton = event.target.closest("[data-custom-option-select]");
+    if (selectButton) {
+      selectCustomFormOption(
+        selectButton.dataset.customOptionSelect,
+        Number(selectButton.dataset.customOptionIndex),
+      );
+      return;
+    }
+    const toggle = event.target.closest("[data-custom-option-toggle]");
+    if (toggle) {
+      setCustomOptionPanelExpanded(
+        toggle.dataset.customOptionToggle,
+        toggle.getAttribute("aria-expanded") !== "true",
+      );
+    }
+  });
+  elements.applicationForm.addEventListener("keydown", (event) => {
+    const entry = event.target.closest("[data-custom-option-entry]");
+    if (!entry || event.key !== "Enter" || event.isComposing) return;
+    event.preventDefault();
+    addCustomFormOptions(entry.dataset.customOptionEntry);
   });
   $$('[data-close-dialog]').forEach((button) => {
     button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog)?.close());

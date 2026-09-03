@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-6')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-6'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-7')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-7'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-6'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-6'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-6'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-7'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-7'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-7'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -147,10 +147,56 @@ try {
   await saveScreenshot(client, "new-application-desktop.png");
 
   await evaluate(client, `(() => {
+    document.querySelector('[data-custom-option-toggle="position"]').click();
+    document.querySelector('[data-custom-option-entry="position"]').value = '前端开发工程师，机械工程师；工艺工程师，机械工程师';
+    document.querySelector('[data-custom-option-add="position"]').click();
+    return true;
+  })()`);
+  await waitFor(client, "document.querySelectorAll('#position-custom-options option').length === 3");
+  assert.deepEqual(await evaluate(client, `(() => ({
+    options: [...document.querySelectorAll('#position-custom-options option')].map((option) => option.value),
+    stored: JSON.parse(localStorage.getItem('jobtrail.preference.custom-form-options')).positions,
+  }))()`), {
+    options: ["前端开发工程师", "机械工程师", "工艺工程师"],
+    stored: ["前端开发工程师", "机械工程师", "工艺工程师"],
+  });
+  await evaluate(client, "document.querySelector('[data-custom-option-select=\"position\"][data-custom-option-index=\"1\"]').click(); true");
+  assert.equal(await evaluate(client, "document.querySelector('#application-form').elements.position.value"), "机械工程师");
+
+  await evaluate(client, `(() => {
+    document.querySelector('[data-custom-option-toggle="position"]').click();
+    document.querySelector('[data-custom-option-delete="position"][data-custom-option-index="2"]').click();
+    return true;
+  })()`);
+  await waitFor(client, "document.querySelectorAll('#position-custom-options option').length === 2");
+  assert.deepEqual(await evaluate(client, `(() => ({
+    options: [...document.querySelectorAll('#position-custom-options option')].map((option) => option.value),
+    selectedValue: document.querySelector('#application-form').elements.position.value,
+  }))()`), { options: ["前端开发工程师", "机械工程师"], selectedValue: "机械工程师" });
+
+  await evaluate(client, `(() => {
+    document.querySelector('[data-custom-option-toggle="city"]').click();
+    document.querySelector('[data-custom-option-entry="city"]').value = '上海，北京；深圳、上海';
+    document.querySelector('[data-custom-option-add="city"]').click();
+    return true;
+  })()`);
+  await waitFor(client, "document.querySelectorAll('#city-custom-options option').length === 3");
+  await sleep(250);
+  await saveScreenshot(client, "application-custom-options-desktop.png");
+  await evaluate(client, "document.querySelector('[data-custom-option-select=\"city\"][data-custom-option-index=\"0\"]').click(); true");
+  assert.deepEqual(await evaluate(client, `(() => ({
+    city: document.querySelector('#application-form').elements.city.value,
+    stored: JSON.parse(localStorage.getItem('jobtrail.preference.custom-form-options')),
+  }))()`), {
+    city: "上海",
+    stored: { positions: ["前端开发工程师", "机械工程师"], cities: ["上海", "北京", "深圳"] },
+  });
+
+  await evaluate(client, `(() => {
     const form = document.querySelector('#application-form');
     if (form.elements.source || form.elements.contact) throw new Error('Removed fields are still present');
-    form.elements.position.value = '前端开发工程师';
-    form.elements.city.value = '上海';
+    if (form.elements.city.value !== '上海') throw new Error('Custom city selection failed');
+    form.elements.position.value = '临时前端岗位';
     form.elements.salary.value = '25k–35k · 14薪';
     form.elements.jobUrl.value = 'https://jobs.example.com/frontend?companyName=%E6%98%9F%E6%B2%B3%E7%A7%91%E6%8A%80';
     form.elements.jobUrl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -179,29 +225,35 @@ try {
   assert.equal(await evaluate(client, "document.querySelectorAll('.application-card').length"), 1);
   assert.equal(await evaluate(client, "document.querySelector('.application-card').textContent.includes('星河科技')"), true);
 
+  await evaluate(client, "document.documentElement.dataset.appReady = 'reloading'; location.reload(); true");
+  await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true' && document.querySelector('#stat-total')?.textContent === '1'");
   await evaluate(client, "document.querySelector('#add-application-button').click(); true");
   await waitFor(client, "document.querySelector('#application-dialog').open");
-  const plainApplicationFields = await evaluate(client, `(() => {
+  const manualOptionFields = await evaluate(client, `(() => {
     const form = document.querySelector('#application-form');
     return {
       positionList: form.elements.position.getAttribute('list'),
       cityList: form.elements.city.getAttribute('list'),
       positionAutocomplete: form.elements.position.autocomplete,
       cityAutocomplete: form.elements.city.autocomplete,
-      historyElements: document.querySelectorAll('[id*="history"], [data-history-toggle], [data-history-select], [data-history-delete]').length,
-      savedHistory: localStorage.getItem('jobtrail.preference.form-history'),
+      positionOptions: [...document.querySelectorAll('#position-custom-options option')].map((option) => option.value),
+      cityOptions: [...document.querySelectorAll('#city-custom-options option')].map((option) => option.value),
+      stored: JSON.parse(localStorage.getItem('jobtrail.preference.custom-form-options')),
+      autoAddedTemporaryValue: [...document.querySelectorAll('#position-custom-options option')].some((option) => option.value === '临时前端岗位'),
     };
   })()`);
-  assert.deepEqual(plainApplicationFields, {
-    positionList: null,
-    cityList: null,
+  assert.deepEqual(manualOptionFields, {
+    positionList: "position-custom-options",
+    cityList: "city-custom-options",
     positionAutocomplete: "off",
     cityAutocomplete: "off",
-    historyElements: 0,
-    savedHistory: null,
+    positionOptions: ["前端开发工程师", "机械工程师"],
+    cityOptions: ["上海", "北京", "深圳"],
+    stored: { positions: ["前端开发工程师", "机械工程师"], cities: ["上海", "北京", "深圳"] },
+    autoAddedTemporaryValue: false,
   });
   await sleep(250);
-  await saveScreenshot(client, "application-plain-fields-desktop.png");
+  await saveScreenshot(client, "application-manual-options-desktop.png");
   await evaluate(client, "document.querySelector('#application-dialog [data-close-dialog=\"application-dialog\"]').click(); true");
 
   const defaultAppliedState = await evaluate(client, `(() => {
@@ -210,12 +262,14 @@ try {
     return {
       currentStageId: app.currentStageId,
       timelineLength: app.timeline.length,
+      position: app.position,
       cardCompleted: document.querySelector('.completed-stage-tag')?.textContent.trim(),
     };
   })()`);
   assert.deepEqual(defaultAppliedState, {
     currentStageId: "applied",
     timelineLength: 1,
+    position: "临时前端岗位",
     cardCompleted: "已完成",
   });
   await saveScreenshot(client, "default-applied-card-desktop.png");
@@ -566,7 +620,7 @@ try {
   await saveScreenshot(client, "legacy-talent-pool-migration-desktop.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: version upgrade → retired history cleanup → stage completion → exclusive filters → talent-pool migration → desktop render");
+  console.log("Browser smoke test passed: version upgrade → manual form options → stage completion → exclusive filters → talent-pool migration → desktop render");
 } finally {
   client.close();
 }
