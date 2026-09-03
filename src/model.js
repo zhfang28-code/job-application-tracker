@@ -436,6 +436,33 @@ export function updateApplication(application, input, now = new Date()) {
   };
 }
 
+export function markCurrentStageCompleted(application, details = {}, now = new Date()) {
+  const app = normalizeApplication(application);
+  if (
+    TERMINAL_STATUSES.has(app.status)
+    || app.currentStageId === "offer"
+    || completedStageIds(app).has(app.currentStageId)
+  ) {
+    return app;
+  }
+
+  const timestamp = toIsoDate(details.at ?? now);
+  return {
+    ...app,
+    timeline: [
+      ...app.timeline,
+      {
+        id: makeId("event"),
+        stageId: app.currentStageId,
+        type: "completed",
+        at: timestamp,
+        note: cleanText(details.note, "手动标记为已完成"),
+      },
+    ],
+    updatedAt: timestamp,
+  };
+}
+
 export function completeCurrentStage(application, details = {}, now = new Date()) {
   const app = normalizeApplication(application);
   if (TERMINAL_STATUSES.has(app.status)) return app;
@@ -469,16 +496,16 @@ export function completeCurrentStage(application, details = {}, now = new Date()
       nextStageId = requestedNextStageId;
     }
   }
-  const timeline = [
-    ...app.timeline,
-    {
+  const timeline = [...app.timeline];
+  if (!completedStageIds(app).has(app.currentStageId)) {
+    timeline.push({
       id: makeId("event"),
       stageId: app.currentStageId,
       type: "completed",
       at: timestamp,
       note: cleanText(details.note),
-    },
-  ];
+    });
+  }
 
   if (!nextStageId || app.currentStageId === "offer") {
     return {

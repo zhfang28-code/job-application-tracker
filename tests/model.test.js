@@ -11,6 +11,7 @@ import {
   hasScheduledFollowUp,
   inferCompanyFromUrl,
   isFollowUpDue,
+  markCurrentStageCompleted,
   mergeApplications,
   moveToStage,
   normalizeApplication,
@@ -115,6 +116,25 @@ test("完成阶段会自动进入公司实际存在的下一环节", () => {
   assert.equal(updated.timeline.at(-2).note, "网申已提交");
   assert.equal(updated.timeline.at(-1).type, "entered");
   assert.equal(updated.timeline.at(-1).stageId, "ai-interview");
+});
+
+test("可单独标记当前环节完成并在记录下一步时避免重复", () => {
+  const application = moveToStage(sample(), "assessment", {}, NOW);
+  const marked = markCurrentStageCompleted(application, {}, NOW);
+  const markedAgain = markCurrentStageCompleted(marked, {}, NOW);
+  const advanced = completeCurrentStage(markedAgain, {
+    nextStageId: "first-interview",
+  }, new Date("2026-08-31T08:00:00.000Z"));
+
+  assert.equal(marked.currentStageId, "assessment");
+  assert.equal(marked.timeline.at(-1).type, "completed");
+  assert.equal(marked.timeline.at(-1).stageId, "assessment");
+  assert.equal(markedAgain.timeline.length, marked.timeline.length);
+  assert.equal(advanced.currentStageId, "first-interview");
+  assert.equal(
+    advanced.timeline.filter((event) => event.stageId === "assessment" && event.type === "completed").length,
+    1,
+  );
 });
 
 test("进入 Offer 环节即标记为已收 Offer", () => {

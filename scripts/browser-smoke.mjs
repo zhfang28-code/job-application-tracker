@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-3')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260901-3'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-1')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-1'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260901-3'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260901-3'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260901-3'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-1'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-1'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-1'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -199,8 +199,38 @@ try {
   assert.equal(detailFontSizes.section >= 16, true);
   assert.equal(detailFontSizes.notes >= 14, true);
   assert.equal(detailFontSizes.drawerWidth >= 700, true);
+  const detailActions = await evaluate(client, `(() => {
+    const primary = document.querySelector('[data-detail-action="progress"]');
+    const status = document.querySelector('.detail-status-action');
+    const complete = document.querySelector('.route-complete-button');
+    return {
+      statusText: status?.textContent.trim(),
+      statusAfterPrimary: Boolean(primary.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING),
+      completeText: complete?.textContent.trim(),
+      currentStage: complete?.dataset.stageId,
+    };
+  })()`);
+  assert.deepEqual(detailActions, {
+    statusText: "更新流程状态",
+    statusAfterPrimary: true,
+    completeText: "标记已完成",
+    currentStage: "first-interview",
+  });
   await sleep(3300);
   await saveScreenshot(client, "detail-desktop.png");
+  await evaluate(client, "document.querySelector('.route-complete-button').click(); true");
+  await waitFor(client, "document.querySelector('.route-step.is-current.is-complete') && document.querySelector('.route-complete-state')?.textContent.includes('已完成')");
+  const completedStage = await evaluate(client, `(() => {
+    const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
+    const app = payload.applications.find((item) => item.company === '星河科技');
+    return {
+      currentStageId: app.currentStageId,
+      completions: app.timeline.filter((event) => event.stageId === 'first-interview' && event.type === 'completed').length,
+      timelineLength: app.timeline.length,
+    };
+  })()`);
+  assert.deepEqual(completedStage, { currentStageId: "first-interview", completions: 1, timelineLength: 4 });
+  await saveScreenshot(client, "detail-stage-completed-desktop.png");
   await evaluate(client, "document.querySelector('[data-close-dialog=\"detail-dialog\"]').click(); true");
 
   await evaluate(client, `(() => {

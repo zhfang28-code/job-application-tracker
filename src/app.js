@@ -11,6 +11,7 @@ import {
   hasScheduledFollowUp,
   inferCompanyFromUrl,
   isFollowUpDue,
+  markCurrentStageCompleted,
   mergeApplications,
   moveToStage,
   parseImportPayload,
@@ -18,9 +19,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260901-3";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260901-3";
-import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260901-3";
+} from "./model.js?v=20260903-1";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-1";
+import { loadApplications, loadPreference, saveApplications, savePreference } from "./storage.js?v=20260903-1";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -598,14 +599,27 @@ function routeHtml(application) {
   const skipped = new Set(application.timeline.filter((event) => event.type === "skipped").map((event) => event.stageId));
   return application.pipeline.map((stageId) => {
     const stage = stageById(stageId);
+    const isComplete = complete.has(stageId);
+    const isSkipped = skipped.has(stageId);
+    const isCurrent = application.currentStageId === stageId;
     const classes = [
       "route-step",
-      complete.has(stageId) ? "is-complete" : "",
-      skipped.has(stageId) ? "is-skipped" : "",
-      application.currentStageId === stageId ? "is-current" : "",
+      isComplete ? "is-complete" : "",
+      isSkipped ? "is-skipped" : "",
+      isCurrent ? "is-current" : "",
     ].filter(Boolean).join(" ");
-    const marker = complete.has(stageId) ? "✓" : application.currentStageId === stageId ? "•" : "";
-    return `<div class="${classes}" style="${stageStyle(stageId)}"><span class="route-node">${marker}</span><span>${escapeHtml(stage.shortLabel)}</span></div>`;
+    const marker = isComplete ? "✓" : isCurrent ? "•" : "";
+    const canComplete = isCurrent
+      && !isComplete
+      && !isSkipped
+      && stageId !== "offer"
+      && !["offer", "rejected", "withdrawn"].includes(application.status);
+    const completionControl = isComplete
+      ? `<span class="route-complete-state">${icon("check")}已完成</span>`
+      : canComplete
+        ? `<button class="route-complete-button" type="button" data-detail-action="complete-stage" data-stage-id="${stageId}">${icon("check")}标记已完成</button>`
+        : "";
+    return `<div class="${classes}" style="${stageStyle(stageId)}"><span class="route-node">${marker}</span><span class="route-label">${escapeHtml(stage.shortLabel)}</span>${completionControl}</div>`;
   }).join("");
 }
 
@@ -640,6 +654,9 @@ function renderDetail(applicationId) {
     : application.status === "offer"
       ? `<button class="button button-ghost" type="button" data-detail-action="status">${icon("sparkle")}更新最终状态</button>`
       : `<button class="button button-primary" type="button" data-detail-action="status">${icon("arrow")}重新开启流程</button>`;
+  const visibleStatusAction = !closed && application.status !== "offer"
+    ? `<button class="button button-ghost detail-status-action" type="button" data-detail-action="status">${icon("more")}更新流程状态</button>`
+    : "";
   const jumpOptions = application.pipeline.map((stageId) => `<option value="${stageId}" ${stageId === application.currentStageId ? "selected" : ""}>${escapeHtml(stageById(stageId).label)}</option>`).join("");
 
   elements.detailContent.innerHTML = `
@@ -659,8 +676,8 @@ function renderDetail(applicationId) {
       <div class="detail-actions">
         ${primaryAction}
         <div class="detail-secondary-actions">
+          ${visibleStatusAction}
           <button class="icon-button" type="button" data-detail-action="edit" title="编辑投递" aria-label="编辑投递">${icon("edit")}</button>
-          <button class="icon-button" type="button" data-detail-action="status" title="更新状态" aria-label="更新状态">${icon("more")}</button>
         </div>
       </div>
     </section>
@@ -696,6 +713,7 @@ function openProgress(applicationId) {
   const application = applications.find((item) => item.id === applicationId);
   if (!application || ["offer", "rejected", "withdrawn"].includes(application.status)) return;
   const stage = stageById(application.currentStageId);
+  const currentCompleted = completedStageIds(application).has(application.currentStageId);
   const currentIndex = application.pipeline.indexOf(application.currentStageId);
   const unavailableStageIds = new Set(application.pipeline.slice(0, currentIndex + 1));
   const availableStages = STAGES.filter(
@@ -708,7 +726,7 @@ function openProgress(applicationId) {
   elements.progressForm.elements.nextStageId.innerHTML = `
     <option value="">请选择已确认的下一环节</option>
     ${availableStages.map((candidate) => `<option value="${candidate.id}">${escapeHtml(candidate.label)}</option>`).join("")}`;
-  $("#progress-current").innerHTML = `<span class="stage-bubble" style="${stageStyle(stage.id)}">${escapeHtml(stage.shortLabel.slice(0, 2))}</span><span><strong>当前：${escapeHtml(stage.label)}</strong><small>下一步以公司实际通知为准</small></span>`;
+  $("#progress-current").innerHTML = `<span class="stage-bubble" style="${stageStyle(stage.id)}">${escapeHtml(stage.shortLabel.slice(0, 2))}</span><span><strong>当前：${escapeHtml(stage.label)}</strong><small>${currentCompleted ? "本环节已完成，等待公司通知下一步" : "下一步以公司实际通知为准"}</small></span>`;
   $("#progress-description").textContent = "选择公司已经确认的下一环节，系统会按真实顺序补进流程。";
   $("#complete-stage-label").textContent = "保存并进入下一环节";
   elements.progressDialog.showModal();
@@ -916,6 +934,17 @@ function setupEventListeners() {
     if (action === "progress") openProgress(application.id);
     if (action === "edit") openApplicationForm(application);
     if (action === "status") openOutcome(application.id);
+    if (action === "complete-stage") {
+      const stageId = button.dataset.stageId;
+      if (stageId === application.currentStageId) {
+        const updated = markCurrentStageCompleted(application);
+        if (updated.timeline.length > application.timeline.length) {
+          updateApplicationInState(updated);
+          persist(`「${stageById(stageId).label}」已标记完成`);
+          renderAll();
+        }
+      }
+    }
     if (action === "jump-stage") {
       const target = $("#stage-jump-select")?.value;
       if (target && target !== application.currentStageId) {

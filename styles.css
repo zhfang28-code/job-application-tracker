@@ -915,6 +915,7 @@ dialog::backdrop {
 .detail-actions .button { min-height: 46px; font-size: 13px; }
 .detail-secondary-actions { display: flex; gap: 8px; }
 .detail-secondary-actions .icon-button { width: 46px; height: 46px; }
+.detail-status-action { min-width: 132px; white-space: nowrap; }
 
 .detail-section { padding: 30px 0; border-bottom: 1px solid var(--line); }
 .detail-section:last-child { border-bottom: 0; }
@@ -929,9 +930,17 @@ dialog::backdrop {
 .route-node { position: relative; z-index: 1; display: grid; width: 28px; height: 28px; place-items: center; border: 2px solid var(--line-strong); border-radius: 50%; background: var(--surface); font-size: 11px; }
 .route-step.is-complete .route-node { border-color: var(--green); background: var(--green); color: white; }
 .route-step.is-current .route-node { border-color: var(--stage-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--stage-color) 12%, transparent); color: var(--stage-color); }
+.route-step.is-current.is-complete .route-node { border-color: var(--green); box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 12%, transparent); color: white; }
 .route-step.is-skipped .route-node { border-style: dashed; }
-.route-step span:last-child { max-width: 84px; margin-top: 8px; font-size: 11px; line-height: 1.35; }
-.route-step.is-current span:last-child { color: var(--text); font-weight: 700; }
+.route-label { max-width: 84px; margin-top: 8px; font-size: 11px; line-height: 1.35; }
+.route-step.is-current .route-label { color: var(--text); font-weight: 700; }
+.route-complete-button,
+.route-complete-state { position: relative; z-index: 1; display: inline-flex; min-height: 26px; align-items: center; justify-content: center; gap: 3px; margin-top: 8px; padding: 4px 8px; border-radius: 7px; font-size: 9px; line-height: 1; white-space: nowrap; }
+.route-complete-button { border: 1px solid color-mix(in srgb, var(--green) 34%, var(--line)); background: var(--surface); color: var(--green); cursor: pointer; font-weight: 700; }
+.route-complete-button:hover { border-color: var(--green); background: var(--green-soft); }
+.route-complete-state { background: var(--green-soft); color: var(--green); font-weight: 650; }
+.route-complete-button .icon,
+.route-complete-state .icon { width: 11px; height: 11px; }
 
 .stage-jump {
   display: grid;
