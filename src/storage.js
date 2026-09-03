@@ -1,4 +1,4 @@
-import { STORAGE_KEY, normalizeApplication } from "./model.js?v=20260903-5";
+import { STORAGE_KEY, normalizeApplication } from "./model.js?v=20260903-6";
 
 export function loadApplications(storage = globalThis.localStorage) {
   try {
@@ -34,6 +34,14 @@ export function loadPreference(key, fallback = "") {
 export function savePreference(key, value) {
   try {
     globalThis.localStorage.setItem(`jobtrail.preference.${key}`, String(value));
+  } catch {
+    // The app remains usable when private browsing blocks localStorage.
+  }
+}
+
+export function removePreference(key) {
+  try {
+    globalThis.localStorage.removeItem(`jobtrail.preference.${key}`);
   } catch {
     // The app remains usable when private browsing blocks localStorage.
   }

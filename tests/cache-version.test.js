@@ -35,12 +35,16 @@ test("新版概览所需的统计节点完整存在", async () => {
     "nav-followup",
     "nav-closed",
     "open-job-link-button",
+    "progress-complete-current-button",
+  ]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  for (const retiredId of [
     "position-history-options",
     "position-history-manager",
     "city-history-options",
     "city-history-manager",
-    "progress-complete-current-button",
   ]) {
-    assert.match(html, new RegExp(`id="${id}"`));
+    assert.doesNotMatch(html, new RegExp(`id="${retiredId}"`));
   }
 });

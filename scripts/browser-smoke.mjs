@@ -109,20 +109,33 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-5')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-5'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-6')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260903-6'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-5'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-5'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-5'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260903-6'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260903-6'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260903-6'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
-  await evaluate(client, "document.documentElement.dataset.appReady = 'reloading'; localStorage.clear(); location.reload(); true");
+  await evaluate(client, `(() => {
+    document.documentElement.dataset.appReady = 'reloading';
+    localStorage.clear();
+    localStorage.setItem('jobtrail.preference.form-history', '{"positions":["旧岗位"],"cities":["旧城市"]}');
+    localStorage.setItem('jobtrail.preference.form-history-initialized', 'true');
+    localStorage.setItem('jobtrail.preference.form-history-dismissed', '{"positions":["已删除岗位"],"cities":[]}');
+    location.reload();
+    return true;
+  })()`);
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true' && document.querySelector('#stat-total')?.textContent === '0'");
   client.browserExceptions.length = 0;
   assert.equal(await evaluate(client, "document.querySelectorAll('.application-card').length"), 0);
+  assert.deepEqual(await evaluate(client, `(() => ({
+    history: localStorage.getItem('jobtrail.preference.form-history'),
+    initialized: localStorage.getItem('jobtrail.preference.form-history-initialized'),
+    dismissed: localStorage.getItem('jobtrail.preference.form-history-dismissed'),
+  }))()`), { history: null, initialized: null, dismissed: null });
 
   await evaluate(client, "document.querySelector('#add-application-button').click(); true");
   await waitFor(client, "document.querySelector('#application-dialog').open");
@@ -168,117 +181,27 @@ try {
 
   await evaluate(client, "document.querySelector('#add-application-button').click(); true");
   await waitFor(client, "document.querySelector('#application-dialog').open");
-  const formHistory = await evaluate(client, `(() => {
+  const plainApplicationFields = await evaluate(client, `(() => {
     const form = document.querySelector('#application-form');
-    const saved = JSON.parse(localStorage.getItem('jobtrail.preference.form-history'));
     return {
       positionList: form.elements.position.getAttribute('list'),
       cityList: form.elements.city.getAttribute('list'),
-      positionOptions: [...document.querySelectorAll('#position-history-options option')].map((option) => option.value),
-      cityOptions: [...document.querySelectorAll('#city-history-options option')].map((option) => option.value),
-      saved,
+      positionAutocomplete: form.elements.position.autocomplete,
+      cityAutocomplete: form.elements.city.autocomplete,
+      historyElements: document.querySelectorAll('[id*="history"], [data-history-toggle], [data-history-select], [data-history-delete]').length,
+      savedHistory: localStorage.getItem('jobtrail.preference.form-history'),
     };
   })()`);
-  assert.deepEqual(formHistory, {
-    positionList: "position-history-options",
-    cityList: "city-history-options",
-    positionOptions: ["前端开发工程师"],
-    cityOptions: ["上海"],
-    saved: { positions: ["前端开发工程师"], cities: ["上海"] },
+  assert.deepEqual(plainApplicationFields, {
+    positionList: null,
+    cityList: null,
+    positionAutocomplete: "off",
+    cityAutocomplete: "off",
+    historyElements: 0,
+    savedHistory: null,
   });
-  await saveScreenshot(client, "application-history-options-desktop.png");
-
-  await evaluate(client, "document.querySelector('[data-history-toggle=\"position\"]').click(); true");
-  await waitFor(client, "!document.querySelector('#position-history-manager').classList.contains('is-hidden')");
-  assert.deepEqual(await evaluate(client, `(() => ({
-    expanded: document.querySelector('[data-history-toggle="position"]').getAttribute('aria-expanded'),
-    value: document.querySelector('[data-history-select="position"]').textContent.trim(),
-    deleteLabel: document.querySelector('[data-history-delete="position"]').getAttribute('aria-label'),
-  }))()`), {
-    expanded: "true",
-    value: "前端开发工程师",
-    deleteLabel: "删除岗位历史记录并不再保存：前端开发工程师",
-  });
-  await saveScreenshot(client, "application-history-manager-desktop.png");
-
-  await evaluate(client, `(() => {
-    document.querySelector('[data-history-toggle="city"]').click();
-    document.querySelector('[data-history-select="city"]').click();
-    return true;
-  })()`);
-  assert.deepEqual(await evaluate(client, `(() => ({
-    city: document.querySelector('#application-form').elements.city.value,
-    cityManagerHidden: document.querySelector('#city-history-manager').classList.contains('is-hidden'),
-  }))()`), { city: "上海", cityManagerHidden: true });
-
-  await evaluate(client, `(() => {
-    document.querySelector('[data-history-toggle="position"]').click();
-    document.querySelector('[data-history-delete="position"]').click();
-    return true;
-  })()`);
-  await waitFor(client, "document.querySelectorAll('#position-history-options option').length === 0 && document.querySelector('[data-history-toggle=\"position\"]').disabled");
-  assert.deepEqual(await evaluate(client, `(() => {
-    const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
-    return {
-      toggleLabel: document.querySelector('[data-history-toggle="position"]').textContent.trim(),
-      managerHidden: document.querySelector('#position-history-manager').classList.contains('is-hidden'),
-      saved: JSON.parse(localStorage.getItem('jobtrail.preference.form-history')),
-      dismissed: JSON.parse(localStorage.getItem('jobtrail.preference.form-history-dismissed')),
-      applicationPosition: payload.applications[0].position,
-    };
-  })()`), {
-    toggleLabel: "暂无记录",
-    managerHidden: true,
-    saved: { positions: [], cities: ["上海"] },
-    dismissed: { positions: ["前端开发工程师"], cities: [] },
-    applicationPosition: "前端开发工程师",
-  });
-  await saveScreenshot(client, "application-history-deleted-desktop.png");
-  await evaluate(client, "document.querySelector('#application-dialog [data-close-dialog=\"application-dialog\"]').click(); true");
-
-  await evaluate(client, "document.documentElement.dataset.appReady = 'reloading'; location.reload(); true");
-  await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true' && document.querySelector('#stat-total')?.textContent === '1'");
-  await evaluate(client, "document.querySelector('#add-application-button').click(); true");
-  await waitFor(client, "document.querySelector('#application-dialog').open");
-  assert.deepEqual(await evaluate(client, `(() => ({
-    positionOptions: [...document.querySelectorAll('#position-history-options option')].map((option) => option.value),
-    cityOptions: [...document.querySelectorAll('#city-history-options option')].map((option) => option.value),
-    initialized: localStorage.getItem('jobtrail.preference.form-history-initialized'),
-    dismissed: JSON.parse(localStorage.getItem('jobtrail.preference.form-history-dismissed')),
-  }))()`), {
-    positionOptions: [],
-    cityOptions: ["上海"],
-    initialized: "true",
-    dismissed: { positions: ["前端开发工程师"], cities: [] },
-  });
-
-  await evaluate(client, `(() => {
-    const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
-    const application = payload.applications[0];
-    const form = document.querySelector('#application-form');
-    form.elements.applicationId.value = application.id;
-    form.elements.company.value = application.company;
-    form.elements.position.value = application.position;
-    form.elements.city.value = application.city;
-    form.elements.salary.value = application.salary;
-    form.elements.jobUrl.value = application.applicationEmail || application.jobUrl;
-    form.elements.appliedAt.value = application.appliedAt.slice(0, 10);
-    form.elements.nextFollowUp.value = application.nextFollowUp;
-    form.elements.tags.value = application.tags.join('，');
-    form.elements.notes.value = application.notes;
-    form.requestSubmit();
-    return true;
-  })()`);
-  await waitFor(client, "!document.querySelector('#application-dialog').open");
-  await evaluate(client, "document.querySelector('#add-application-button').click(); true");
-  await waitFor(client, "document.querySelector('#application-dialog').open");
-  assert.deepEqual(await evaluate(client, `(() => ({
-    positionOptions: [...document.querySelectorAll('#position-history-options option')].map((option) => option.value),
-    dismissed: JSON.parse(localStorage.getItem('jobtrail.preference.form-history-dismissed')),
-  }))()`), {
-    positionOptions: [],
-    dismissed: { positions: ["前端开发工程师"], cities: [] },
-  });
+  await sleep(250);
+  await saveScreenshot(client, "application-plain-fields-desktop.png");
   await evaluate(client, "document.querySelector('#application-dialog [data-close-dialog=\"application-dialog\"]').click(); true");
 
   const defaultAppliedState = await evaluate(client, `(() => {
@@ -643,7 +566,7 @@ try {
   await saveScreenshot(client, "legacy-talent-pool-migration-desktop.png");
   assert.deepEqual(client.browserExceptions, []);
 
-  console.log("Browser smoke test passed: version upgrade → form history → stage completion → exclusive filters → talent-pool migration → desktop render");
+  console.log("Browser smoke test passed: version upgrade → retired history cleanup → stage completion → exclusive filters → talent-pool migration → desktop render");
 } finally {
   client.close();
 }
