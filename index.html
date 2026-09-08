@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20260908-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260908-4" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -372,6 +372,14 @@
             </select>
             <small>只记录已经确定的安排，未经历的环节不会加入流程。</small>
           </label>
+          <div class="form-field presentation-location-field" id="presentation-location-field" hidden>
+            <span>宣讲地点</span>
+            <div class="presentation-location-control">
+              <input name="presentationLocation" type="text" maxlength="240" placeholder="例如：XX 大学就业指导中心 3 楼报告厅" />
+              <button class="button button-ghost button-small" type="button" id="save-presentation-location-button">保存地点</button>
+            </div>
+            <small id="presentation-location-help">填写后会显示在公司卡片上。</small>
+          </div>
           <label class="form-field"><span>完成时间</span><input name="completedAt" type="datetime-local" /></label>
           <label class="form-field"><span>本阶段记录</span><textarea name="note" rows="4" maxlength="800" placeholder="例如：测评已提交；面试官关注了项目难点…"></textarea></label>
           <label class="form-field" id="next-follow-up-field"><span>下次跟进</span><input name="nextFollowUp" type="date" /></label>
@@ -426,11 +434,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20260908-2", { updateViaCache: "none" })
+          .register("./sw.js?v=20260908-4", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20260908-2"></script>
+    <script type="module" src="./src/app.js?v=20260908-4"></script>
   </body>
 </html>

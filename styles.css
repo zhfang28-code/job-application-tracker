@@ -716,6 +716,23 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
 .card-follow-up-date.is-due { color: var(--orange); }
 .card-follow-up-date.is-empty { color: var(--text-faint); font-weight: 500; }
 
+.card-presentation-location {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--pink) 22%, var(--line));
+  border-radius: 10px;
+  background: var(--pink-soft);
+  color: color-mix(in srgb, var(--pink) 72%, var(--text));
+  font-size: 12px;
+  line-height: 1.45;
+}
+.card-presentation-location .icon { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
+.card-presentation-location span { min-width: 0; overflow-wrap: anywhere; }
+.card-presentation-location strong { margin-right: 5px; font-weight: 750; }
+
 .progress-track { height: 5px; margin-top: 15px; overflow: hidden; border-radius: 99px; background: var(--surface-soft); }
 .progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--stage-color, var(--primary)), color-mix(in srgb, var(--stage-color, var(--primary)) 55%, #fff)); transition: width 0.3s ease; }
 
@@ -1031,6 +1048,11 @@ dialog::backdrop {
 .progress-current small { margin-top: 2px; color: var(--text-faint); font-size: 9px; }
 .progress-modal .form-field > small { margin-top: 5px; color: var(--text-faint); font-size: 8px; line-height: 1.5; }
 .progress-modal .form-field + .form-field { margin-top: 13px; }
+.presentation-location-field[hidden],
+#save-presentation-location-button[hidden] { display: none !important; }
+.presentation-location-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.presentation-location-control input { min-width: 0; }
+.presentation-location-control .button { min-height: 40px; align-self: stretch; white-space: nowrap; }
 .progress-footer { justify-content: space-between; gap: 12px; }
 .progress-footer > div { display: flex; gap: 8px; }
 .progress-complete-button { border: 1px solid color-mix(in srgb, var(--green) 34%, var(--line)); background: var(--green-soft); color: var(--green); white-space: nowrap; }

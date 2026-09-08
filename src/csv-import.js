@@ -5,12 +5,13 @@ import {
   normalizePipeline,
   stageById,
   toIsoDate,
-} from "./model.js?v=20260908-2";
+} from "./model.js?v=20260908-4";
 
 const HEADER_ALIASES = Object.freeze({
   company: ["单位", "公司", "公司名称", "投递公司"],
   position: ["岗位", "岗位名称", "职位", "职位名称"],
   city: ["城市|工作地", "城市/工作地", "城市", "工作地", "工作地点"],
+  presentationLocation: ["宣讲地点", "宣讲会地点", "线下宣讲地点"],
   target: ["投递链接", "链接/邮箱", "链接／邮箱", "岗位链接", "邮箱"],
   status: ["状态", "目前的进度", "目前进度", "当前进度", "进度"],
   assessment: ["测评|笔试", "测评/笔试", "测评", "笔试", "面试轮次"],
@@ -199,6 +200,7 @@ export function readJobCsv(text, options = {}) {
       company,
       position,
       city: value("city"),
+      presentationLocation: value("presentationLocation"),
       applicationTarget: target,
       appliedAt: appliedAt.value,
       hasSourceDate: !appliedAt.usedFallback,
@@ -294,6 +296,7 @@ function comparisonKey(application) {
     company: application.company,
     position: application.position,
     city: application.city,
+    presentationLocation: application.presentationLocation,
     jobUrl: application.jobUrl,
     applicationEmail: application.applicationEmail,
     appliedAt: application.appliedAt,
@@ -309,6 +312,7 @@ function createImportedApplication(record, importedAt) {
     company: record.company,
     position: record.position,
     city: record.city,
+    presentationLocation: record.presentationLocation,
     jobUrl: record.applicationTarget,
     appliedAt: record.appliedAt,
     importSource: {
@@ -335,6 +339,7 @@ function updateImportedApplication(existing, record, importedAt) {
     company: record.company,
     position: record.position,
     city: record.city || existing.city,
+    presentationLocation: record.presentationLocation || existing.presentationLocation,
     jobUrl: record.applicationTarget ? target.jobUrl : existing.jobUrl,
     applicationEmail: record.applicationTarget ? target.applicationEmail : existing.applicationEmail,
     appliedAt: record.hasSourceDate ? `${record.appliedAt}T12:00:00` : existing.appliedAt,

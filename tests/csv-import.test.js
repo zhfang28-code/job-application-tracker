@@ -23,10 +23,10 @@ test("CSV 解析支持 BOM、逗号、换行和转义引号", () => {
 
 test("按用户表格列名提取重点字段并忽略简历等无关列", () => {
   const csv = [
-    "单位,岗位,城市|工作地,投递链接,状态,测评|笔试,简历附件",
-    "新奥集团,结构工程师,廊坊,https://jobs.example.com/1,已投递,,resume.pdf",
-    "长鑫科技,研发工程师,北京,jobs@example.com,已线上测评,AI面,private.docx",
-    ",缺少公司,上海,https://jobs.example.com/3,已投递,,secret.pdf",
+    "单位,岗位,城市|工作地,宣讲地点,投递链接,状态,测评|笔试,简历附件",
+    "新奥集团,结构工程师,廊坊,河北工业大学报告厅,https://jobs.example.com/1,已投递,,resume.pdf",
+    "长鑫科技,研发工程师,北京,,jobs@example.com,已线上测评,AI面,private.docx",
+    ",缺少公司,上海,,https://jobs.example.com/3,已投递,,secret.pdf",
   ].join("\r\n");
   const result = readJobCsv(csv, { fallbackAppliedAt: FALLBACK_DATE });
 
@@ -39,6 +39,7 @@ test("按用户表格列名提取重点字段并忽略简历等无关列", () =>
   });
   assert.equal(result.records[0].company, "新奥集团");
   assert.equal(result.records[0].city, "廊坊");
+  assert.equal(result.records[0].presentationLocation, "河北工业大学报告厅");
   assert.equal(result.records[1].applicationTarget, "jobs@example.com");
   assert.equal(result.records[1].progress.stageId, "ai-interview");
   assert.equal("resume" in result.records[0], false);

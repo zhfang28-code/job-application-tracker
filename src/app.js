@@ -17,12 +17,13 @@ import {
   moveToStage,
   parseImportPayload,
   setOutcome,
+  setPresentationLocation,
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260908-2";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260908-2";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260908-2";
+} from "./model.js?v=20260908-4";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260908-4";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260908-4";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -711,6 +712,9 @@ function cardHtml(application) {
       ? "无需跟进"
       : "未设跟进";
   const followUpClass = overdue ? " is-due" : application.nextFollowUp ? "" : " is-empty";
+  const presentationLocation = application.currentStageId === "offline-presentation" && application.presentationLocation
+    ? `<div class="card-presentation-location" title="宣讲地点：${escapeHtml(application.presentationLocation)}">${icon("pin")}<span><strong>宣讲地点</strong>${escapeHtml(application.presentationLocation)}</span></div>`
+    : "";
 
   return `
     <article class="application-card${overdue ? " is-overdue" : ""}${closed ? " is-closed" : ""}"
@@ -729,6 +733,7 @@ function cardHtml(application) {
         ${importTag}
         ${tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
       </div>
+      ${presentationLocation}
       <div class="card-meta">
         ${application.city ? `<span>${icon("pin")}${escapeHtml(application.city)}</span>` : ""}
         <span>${icon("calendar")}${formatDate(application.appliedAt)}</span>
@@ -960,6 +965,7 @@ function renderDetail(applicationId) {
       </div>
       <div class="detail-meta">
         ${application.city ? `<span>${icon("pin")}${escapeHtml(application.city)}</span>` : ""}
+        ${application.presentationLocation ? `<span class="detail-presentation-location">${icon("presentation")}宣讲地点：${escapeHtml(application.presentationLocation)}</span>` : ""}
         <span>${icon("calendar")}投递于 ${formatDate(application.appliedAt, fullDateFormatter)}</span>
         ${application.salary ? `<span>${escapeHtml(application.salary)}</span>` : ""}
         ${target.href ? `<a href="${escapeHtml(target.href)}" ${target.kind === "url" ? "target=\"_blank\" rel=\"noopener noreferrer\"" : ""}>${icon("link")}${escapeHtml(target.label)}</a>` : target.value ? `<span>${icon("link")}${escapeHtml(target.value)}</span>` : ""}
@@ -1016,6 +1022,18 @@ function renderProgressCurrent(application) {
       : "标记本环节已完成";
 }
 
+function syncPresentationLocationField(application) {
+  const field = $("#presentation-location-field");
+  const saveButton = $("#save-presentation-location-button");
+  const currentIsPresentation = application.currentStageId === "offline-presentation";
+  const nextIsPresentation = elements.progressForm.elements.nextStageId.value === "offline-presentation";
+  field.hidden = !currentIsPresentation && !nextIsPresentation;
+  saveButton.hidden = !currentIsPresentation;
+  $("#presentation-location-help").textContent = currentIsPresentation
+    ? "可单独保存地点；完成或进入下一环节时也会同步保存。"
+    : "保存进展后，地点会显示在该公司的线下宣讲卡片上。";
+}
+
 function openProgress(applicationId) {
   const application = applications.find((item) => item.id === applicationId);
   if (!application || ["offer", "rejected", "withdrawn"].includes(application.status)) return;
@@ -1028,10 +1046,12 @@ function openProgress(applicationId) {
   elements.progressForm.elements.applicationId.value = application.id;
   elements.progressForm.elements.completedAt.value = localDateTimeString();
   elements.progressForm.elements.nextFollowUp.value = application.nextFollowUp || "";
+  elements.progressForm.elements.presentationLocation.value = application.presentationLocation || "";
   elements.progressForm.elements.nextStageId.innerHTML = `
     <option value="">请选择已确认的下一环节</option>
     ${availableStages.map((candidate) => `<option value="${candidate.id}">${escapeHtml(candidate.label)}</option>`).join("")}`;
   renderProgressCurrent(application);
+  syncPresentationLocationField(application);
   $("#progress-description").textContent = "选择公司已经确认的下一环节，系统会按真实顺序补进流程。";
   $("#complete-stage-label").textContent = "保存并进入下一环节";
   elements.progressDialog.showModal();
@@ -1085,11 +1105,12 @@ function safeCsvCell(value) {
 }
 
 function exportCsv() {
-  const headers = ["公司", "岗位", "城市", "当前进度", "状态", "投递日期", "下次跟进", "薪资", "投递链接/邮箱", "标签", "备注"];
+  const headers = ["公司", "岗位", "城市", "宣讲地点", "当前进度", "状态", "投递日期", "下次跟进", "薪资", "投递链接/邮箱", "标签", "备注"];
   const rows = applications.map((application) => [
     application.company,
     application.position,
     application.city,
+    application.presentationLocation,
     stageById(application.currentStageId).label,
     statusLabel(application),
     formatDateInput(application.appliedAt),
@@ -1245,15 +1266,35 @@ function setupEventListeners() {
     renderAll();
   });
 
+  elements.progressForm.elements.nextStageId.addEventListener("change", () => {
+    const applicationId = formValue(elements.progressForm, "applicationId");
+    const application = applications.find((item) => item.id === applicationId);
+    if (application) syncPresentationLocationField(application);
+  });
+
+  $("#save-presentation-location-button").addEventListener("click", () => {
+    const applicationId = formValue(elements.progressForm, "applicationId");
+    const existing = applications.find((application) => application.id === applicationId);
+    if (!existing || existing.currentStageId !== "offline-presentation") return;
+    const location = formValue(elements.progressForm, "presentationLocation");
+    updateApplicationInState(setPresentationLocation(existing, location));
+    persist(location ? "宣讲地点已保存" : "宣讲地点已清除");
+    renderAll();
+  });
+
   $("#progress-complete-current-button").addEventListener("click", () => {
     const applicationId = formValue(elements.progressForm, "applicationId");
     const existing = applications.find((application) => application.id === applicationId);
     if (!existing) return;
-    const updated = markCurrentStageCompleted(existing, {
+    const details = {
       at: formValue(elements.progressForm, "completedAt"),
       note: formValue(elements.progressForm, "note"),
       nextFollowUp: formValue(elements.progressForm, "nextFollowUp"),
-    });
+    };
+    if (existing.currentStageId === "offline-presentation") {
+      details.presentationLocation = formValue(elements.progressForm, "presentationLocation");
+    }
+    const updated = markCurrentStageCompleted(existing, details);
     if (updated.timeline.length <= existing.timeline.length) return;
     updateApplicationInState(updated);
     persist(`「${stageById(updated.currentStageId).label}」已标记完成`);
@@ -1266,12 +1307,16 @@ function setupEventListeners() {
     const applicationId = formValue(elements.progressForm, "applicationId");
     const existing = applications.find((application) => application.id === applicationId);
     if (!existing) return;
+    const nextStageId = formValue(elements.progressForm, "nextStageId");
     const details = {
       at: formValue(elements.progressForm, "completedAt"),
       note: formValue(elements.progressForm, "note"),
       nextFollowUp: formValue(elements.progressForm, "nextFollowUp"),
-      nextStageId: formValue(elements.progressForm, "nextStageId"),
+      nextStageId,
     };
+    if (existing.currentStageId === "offline-presentation" || nextStageId === "offline-presentation") {
+      details.presentationLocation = formValue(elements.progressForm, "presentationLocation");
+    }
     const updated = completeCurrentStage(existing, details);
     updateApplicationInState(updated);
     persist(`进展已记录，已进入「${stageById(updated.currentStageId).label}」`);

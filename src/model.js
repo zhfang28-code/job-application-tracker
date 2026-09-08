@@ -312,6 +312,7 @@ export function createApplication(input = {}, now = new Date()) {
     company: cleanText(input.company),
     position: cleanText(input.position),
     city: cleanText(input.city),
+    presentationLocation: cleanText(input.presentationLocation),
     jobUrl: target.jobUrl,
     applicationEmail: target.applicationEmail,
     salary: cleanText(input.salary),
@@ -376,6 +377,7 @@ export function normalizeApplication(raw) {
     company: cleanText(raw?.company, "未命名公司"),
     position: cleanText(raw?.position, "未命名岗位"),
     city: cleanText(raw?.city),
+    presentationLocation: cleanText(raw?.presentationLocation),
     jobUrl: target.jobUrl,
     applicationEmail: target.applicationEmail,
     salary: cleanText(raw?.salary),
@@ -418,6 +420,9 @@ export function updateApplication(application, input, now = new Date()) {
     company: cleanText(input.company, original.company),
     position: cleanText(input.position, original.position),
     city: cleanText(input.city),
+    presentationLocation: Object.hasOwn(input, "presentationLocation")
+      ? cleanText(input.presentationLocation)
+      : original.presentationLocation,
     jobUrl: target.jobUrl,
     applicationEmail: target.applicationEmail,
     salary: cleanText(input.salary),
@@ -437,6 +442,15 @@ export function updateApplication(application, input, now = new Date()) {
   };
 }
 
+export function setPresentationLocation(application, location, now = new Date()) {
+  const app = normalizeApplication(application);
+  return {
+    ...app,
+    presentationLocation: cleanText(location),
+    updatedAt: toIsoDate(now),
+  };
+}
+
 export function markCurrentStageCompleted(application, details = {}, now = new Date()) {
   const app = normalizeApplication(application);
   if (
@@ -450,6 +464,9 @@ export function markCurrentStageCompleted(application, details = {}, now = new D
   const timestamp = toIsoDate(details.at ?? now);
   return {
     ...app,
+    presentationLocation: Object.hasOwn(details, "presentationLocation")
+      ? cleanText(details.presentationLocation)
+      : app.presentationLocation,
     nextFollowUp: Object.hasOwn(details, "nextFollowUp")
       ? cleanText(details.nextFollowUp)
       : app.nextFollowUp,
@@ -518,6 +535,9 @@ export function completeCurrentStage(application, details = {}, now = new Date()
       pipeline,
       status: "offer",
       currentStageId: "offer",
+      presentationLocation: Object.hasOwn(details, "presentationLocation")
+        ? cleanText(details.presentationLocation)
+        : app.presentationLocation,
       nextFollowUp: "",
       timeline,
       updatedAt: timestamp,
@@ -537,6 +557,9 @@ export function completeCurrentStage(application, details = {}, now = new Date()
     pipeline,
     currentStageId: nextStageId,
     status: nextStageId === "offer" ? "offer" : "active",
+    presentationLocation: Object.hasOwn(details, "presentationLocation")
+      ? cleanText(details.presentationLocation)
+      : app.presentationLocation,
     nextFollowUp: cleanText(details.nextFollowUp),
     timeline,
     updatedAt: timestamp,
@@ -653,6 +676,9 @@ export function moveToStage(application, targetStageId, details = {}, now = new 
     ...app,
     currentStageId: targetStageId,
     status: targetStageId === "offer" ? "offer" : "active",
+    presentationLocation: Object.hasOwn(details, "presentationLocation")
+      ? cleanText(details.presentationLocation)
+      : app.presentationLocation,
     nextFollowUp: cleanText(details.nextFollowUp),
     timeline,
     updatedAt: timestamp,
