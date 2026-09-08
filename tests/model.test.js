@@ -19,7 +19,7 @@ import {
   normalizeApplication,
   parseImportPayload,
   setOutcome,
-  setPresentationLocation,
+  setPresentationDetails,
   skipCurrentStage,
   summarize,
   updateApplication,
@@ -147,27 +147,38 @@ test("线下宣讲可作为独立的动态阶段加入招聘流程", () => {
     nextStageId: "offline-presentation",
     note: "收到校园宣讲会通知",
     presentationLocation: " 河北工业大学红桥校区报告厅 ",
+    presentationAt: "2026-09-12T19:30",
   }, NOW);
 
   assert.equal(updated.currentStageId, "offline-presentation");
   assert.deepEqual(updated.pipeline, ["applied", "offline-presentation", "offer"]);
   assert.equal(updated.timeline.at(-1).note, "收到校园宣讲会通知");
   assert.equal(updated.presentationLocation, "河北工业大学红桥校区报告厅");
+  assert.equal(updated.presentationAt, "2026-09-12T19:30");
   assert.equal(applicationCategory(updated), "presentation");
 });
 
-test("宣讲地点可独立修改，并兼容没有该字段的旧记录", () => {
+test("宣讲地点与时间可独立修改，并兼容没有这些字段的旧记录", () => {
   const presentation = moveToStage(sample(), "offline-presentation", {}, NOW);
-  const updated = setPresentationLocation(
+  const updated = setPresentationDetails(
     presentation,
-    " 天津大学北洋园校区求实会堂 ",
+    {
+      presentationLocation: " 天津大学北洋园校区求实会堂 ",
+      presentationAt: "2026-09-14T14:00",
+    },
     new Date("2026-08-31T08:00:00.000Z"),
   );
-  const legacy = normalizeApplication({ ...presentation, presentationLocation: undefined });
+  const legacy = normalizeApplication({
+    ...presentation,
+    presentationLocation: undefined,
+    presentationAt: undefined,
+  });
 
   assert.equal(updated.presentationLocation, "天津大学北洋园校区求实会堂");
+  assert.equal(updated.presentationAt, "2026-09-14T14:00");
   assert.equal(updated.updatedAt, "2026-08-31T08:00:00.000Z");
   assert.equal(legacy.presentationLocation, "");
+  assert.equal(legacy.presentationAt, "");
 });
 
 test("可单独标记当前环节完成、保存跟进日期并在记录下一步时避免重复", () => {

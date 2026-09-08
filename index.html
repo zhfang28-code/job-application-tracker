@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20260908-4" />
+    <link rel="stylesheet" href="./styles.css?v=20260908-5" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -376,8 +376,12 @@
             <span>宣讲地点</span>
             <div class="presentation-location-control">
               <input name="presentationLocation" type="text" maxlength="240" placeholder="例如：XX 大学就业指导中心 3 楼报告厅" />
-              <button class="button button-ghost button-small" type="button" id="save-presentation-location-button">保存地点</button>
+              <button class="button button-ghost button-small" type="button" id="save-presentation-location-button">保存宣讲信息</button>
             </div>
+            <label class="form-field presentation-time-control">
+              <span>宣讲时间</span>
+              <input name="presentationAt" type="datetime-local" />
+            </label>
             <small id="presentation-location-help">填写后会显示在公司卡片上。</small>
           </div>
           <label class="form-field"><span>完成时间</span><input name="completedAt" type="datetime-local" /></label>
@@ -434,11 +438,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20260908-4", { updateViaCache: "none" })
+          .register("./sw.js?v=20260908-5", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20260908-4"></script>
+    <script type="module" src="./src/app.js?v=20260908-5"></script>
   </body>
 </html>

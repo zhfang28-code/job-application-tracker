@@ -716,10 +716,9 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
 .card-follow-up-date.is-due { color: var(--orange); }
 .card-follow-up-date.is-empty { color: var(--text-faint); font-weight: 500; }
 
-.card-presentation-location {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
+.card-presentation-details {
+  display: grid;
+  gap: 6px;
   margin-top: 12px;
   padding: 8px 10px;
   border: 1px solid color-mix(in srgb, var(--pink) 22%, var(--line));
@@ -729,9 +728,10 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
   font-size: 12px;
   line-height: 1.45;
 }
-.card-presentation-location .icon { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
-.card-presentation-location span { min-width: 0; overflow-wrap: anywhere; }
-.card-presentation-location strong { margin-right: 5px; font-weight: 750; }
+.card-presentation-details > span { display: flex; min-width: 0; align-items: flex-start; gap: 7px; }
+.card-presentation-details .icon { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
+.card-presentation-details > span > span { min-width: 0; overflow-wrap: anywhere; }
+.card-presentation-details strong { margin-right: 5px; font-weight: 750; }
 
 .progress-track { height: 5px; margin-top: 15px; overflow: hidden; border-radius: 99px; background: var(--surface-soft); }
 .progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--stage-color, var(--primary)), color-mix(in srgb, var(--stage-color, var(--primary)) 55%, #fff)); transition: width 0.3s ease; }
@@ -1053,6 +1053,7 @@ dialog::backdrop {
 .presentation-location-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .presentation-location-control input { min-width: 0; }
 .presentation-location-control .button { min-height: 40px; align-self: stretch; white-space: nowrap; }
+.presentation-time-control { margin-top: 6px; }
 .progress-footer { justify-content: space-between; gap: 12px; }
 .progress-footer > div { display: flex; gap: 8px; }
 .progress-complete-button { border: 1px solid color-mix(in srgb, var(--green) 34%, var(--line)); background: var(--green-soft); color: var(--green); white-space: nowrap; }

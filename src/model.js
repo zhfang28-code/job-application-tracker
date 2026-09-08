@@ -272,6 +272,17 @@ function cleanText(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
 }
 
+function resolvePresentationDetails(application, details = {}) {
+  return {
+    presentationLocation: Object.hasOwn(details, "presentationLocation")
+      ? cleanText(details.presentationLocation)
+      : application.presentationLocation,
+    presentationAt: Object.hasOwn(details, "presentationAt")
+      ? cleanText(details.presentationAt)
+      : application.presentationAt,
+  };
+}
+
 function normalizeApplicationTarget(input = {}) {
   const explicitEmail = cleanText(input.applicationEmail).replace(/^mailto:/i, "");
   const rawTarget = cleanText(input.applicationTarget)
@@ -313,6 +324,7 @@ export function createApplication(input = {}, now = new Date()) {
     position: cleanText(input.position),
     city: cleanText(input.city),
     presentationLocation: cleanText(input.presentationLocation),
+    presentationAt: cleanText(input.presentationAt),
     jobUrl: target.jobUrl,
     applicationEmail: target.applicationEmail,
     salary: cleanText(input.salary),
@@ -378,6 +390,7 @@ export function normalizeApplication(raw) {
     position: cleanText(raw?.position, "未命名岗位"),
     city: cleanText(raw?.city),
     presentationLocation: cleanText(raw?.presentationLocation),
+    presentationAt: cleanText(raw?.presentationAt),
     jobUrl: target.jobUrl,
     applicationEmail: target.applicationEmail,
     salary: cleanText(raw?.salary),
@@ -420,9 +433,7 @@ export function updateApplication(application, input, now = new Date()) {
     company: cleanText(input.company, original.company),
     position: cleanText(input.position, original.position),
     city: cleanText(input.city),
-    presentationLocation: Object.hasOwn(input, "presentationLocation")
-      ? cleanText(input.presentationLocation)
-      : original.presentationLocation,
+    ...resolvePresentationDetails(original, input),
     jobUrl: target.jobUrl,
     applicationEmail: target.applicationEmail,
     salary: cleanText(input.salary),
@@ -442,11 +453,11 @@ export function updateApplication(application, input, now = new Date()) {
   };
 }
 
-export function setPresentationLocation(application, location, now = new Date()) {
+export function setPresentationDetails(application, details = {}, now = new Date()) {
   const app = normalizeApplication(application);
   return {
     ...app,
-    presentationLocation: cleanText(location),
+    ...resolvePresentationDetails(app, details),
     updatedAt: toIsoDate(now),
   };
 }
@@ -464,9 +475,7 @@ export function markCurrentStageCompleted(application, details = {}, now = new D
   const timestamp = toIsoDate(details.at ?? now);
   return {
     ...app,
-    presentationLocation: Object.hasOwn(details, "presentationLocation")
-      ? cleanText(details.presentationLocation)
-      : app.presentationLocation,
+    ...resolvePresentationDetails(app, details),
     nextFollowUp: Object.hasOwn(details, "nextFollowUp")
       ? cleanText(details.nextFollowUp)
       : app.nextFollowUp,
@@ -535,9 +544,7 @@ export function completeCurrentStage(application, details = {}, now = new Date()
       pipeline,
       status: "offer",
       currentStageId: "offer",
-      presentationLocation: Object.hasOwn(details, "presentationLocation")
-        ? cleanText(details.presentationLocation)
-        : app.presentationLocation,
+      ...resolvePresentationDetails(app, details),
       nextFollowUp: "",
       timeline,
       updatedAt: timestamp,
@@ -557,9 +564,7 @@ export function completeCurrentStage(application, details = {}, now = new Date()
     pipeline,
     currentStageId: nextStageId,
     status: nextStageId === "offer" ? "offer" : "active",
-    presentationLocation: Object.hasOwn(details, "presentationLocation")
-      ? cleanText(details.presentationLocation)
-      : app.presentationLocation,
+    ...resolvePresentationDetails(app, details),
     nextFollowUp: cleanText(details.nextFollowUp),
     timeline,
     updatedAt: timestamp,
@@ -676,9 +681,7 @@ export function moveToStage(application, targetStageId, details = {}, now = new 
     ...app,
     currentStageId: targetStageId,
     status: targetStageId === "offer" ? "offer" : "active",
-    presentationLocation: Object.hasOwn(details, "presentationLocation")
-      ? cleanText(details.presentationLocation)
-      : app.presentationLocation,
+    ...resolvePresentationDetails(app, details),
     nextFollowUp: cleanText(details.nextFollowUp),
     timeline,
     updatedAt: timestamp,

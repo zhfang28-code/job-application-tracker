@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260908-4')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260908-4'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260908-5')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260908-5'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260908-4'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260908-4'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260908-4'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260908-5'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260908-5'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260908-5'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -451,6 +451,7 @@ try {
     form.elements.nextStageId.value = 'offline-presentation';
     form.elements.nextStageId.dispatchEvent(new Event('change', { bubbles: true }));
     form.elements.presentationLocation.value = '苏州大学独墅湖校区炳麟图书馆报告厅';
+    form.elements.presentationAt.value = '2026-09-12T19:30';
     form.elements.note.value = '参加校园线下宣讲会';
     form.requestSubmit();
     return true;
@@ -464,14 +465,16 @@ try {
       pipeline: app.pipeline,
       note: app.timeline.at(-1).note,
       presentationLocation: app.presentationLocation,
+      presentationAt: app.presentationAt,
     };
   })()`), {
     currentStageId: "offline-presentation",
     pipeline: ["applied", "offline-presentation", "offer"],
     note: "参加校园线下宣讲会",
     presentationLocation: "苏州大学独墅湖校区炳麟图书馆报告厅",
+    presentationAt: "2026-09-12T19:30",
   });
-  await waitFor(client, "[...document.querySelectorAll('.application-card')].some((card) => card.textContent.includes('平川机械') && card.querySelector('.card-presentation-location')?.textContent.includes('苏州大学独墅湖校区炳麟图书馆报告厅'))");
+  await waitFor(client, "[...document.querySelectorAll('.application-card')].some((card) => card.textContent.includes('平川机械') && card.querySelector('.card-presentation-location')?.textContent.includes('苏州大学独墅湖校区炳麟图书馆报告厅') && card.querySelector('.card-presentation-time')?.textContent.includes('9月12日 19:30'))");
 
   await evaluate(client, `(() => {
     const card = [...document.querySelectorAll('.application-card')]
@@ -482,22 +485,26 @@ try {
   await waitFor(client, "document.querySelector('#progress-dialog').open && !document.querySelector('#presentation-location-field').hidden");
   assert.deepEqual(await evaluate(client, `(() => ({
     value: document.querySelector('#progress-form').elements.presentationLocation.value,
+    presentationAt: document.querySelector('#progress-form').elements.presentationAt.value,
     saveButtonVisible: !document.querySelector('#save-presentation-location-button').hidden,
     help: document.querySelector('#presentation-location-help').textContent,
   }))()`), {
     value: "苏州大学独墅湖校区炳麟图书馆报告厅",
+    presentationAt: "2026-09-12T19:30",
     saveButtonVisible: true,
-    help: "可单独保存地点；完成或进入下一环节时也会同步保存。",
+    help: "可单独保存宣讲地点与时间；完成或进入下一环节时也会同步保存。",
   });
   await saveScreenshot(client, "progress-presentation-location-desktop.png");
   await evaluate(client, `(() => {
     const form = document.querySelector('#progress-form');
     form.elements.presentationLocation.value = '苏州大学天赐庄校区本部礼堂';
+    form.elements.presentationAt.value = '2026-09-14T14:00';
     document.querySelector('#save-presentation-location-button').click();
     return true;
   })()`);
-  await waitFor(client, "JSON.parse(localStorage.getItem('jobtrail.applications.v1')).applications.find((item) => item.company === '平川机械')?.presentationLocation === '苏州大学天赐庄校区本部礼堂'");
+  await waitFor(client, "(() => { const app = JSON.parse(localStorage.getItem('jobtrail.applications.v1')).applications.find((item) => item.company === '平川机械'); return app?.presentationLocation === '苏州大学天赐庄校区本部礼堂' && app?.presentationAt === '2026-09-14T14:00'; })()");
   assert.equal(await evaluate(client, "[...document.querySelectorAll('.application-card')].find((card) => card.textContent.includes('平川机械'))?.querySelector('.card-presentation-location')?.textContent.includes('苏州大学天赐庄校区本部礼堂')"), true);
+  assert.equal(await evaluate(client, "[...document.querySelectorAll('.application-card')].find((card) => card.textContent.includes('平川机械'))?.querySelector('.card-presentation-time')?.textContent.includes('9月14日 14:00')"), true);
   await evaluate(client, "document.querySelector('#progress-dialog [data-close-dialog=\"progress-dialog\"]').click(); true");
 
   await evaluate(client, `(() => {
@@ -627,6 +634,7 @@ try {
   const boardCardSize = await evaluate(client, `(() => ({
     title: Number.parseFloat(getComputedStyle(document.querySelector('.card-title h4')).fontSize),
     presentationLocation: Number.parseFloat(getComputedStyle(document.querySelector('.card-presentation-location')).fontSize),
+    presentationTime: Number.parseFloat(getComputedStyle(document.querySelector('.card-presentation-time')).fontSize),
     width: document.querySelector('.application-card').getBoundingClientRect().width,
     columnWidth: document.querySelector('.board-column').getBoundingClientRect().width,
     horizontalLayout: (() => {
@@ -644,6 +652,7 @@ try {
   }))()`);
   assert.equal(boardCardSize.title >= 16, true);
   assert.equal(boardCardSize.presentationLocation >= 12, true);
+  assert.equal(boardCardSize.presentationTime >= 12, true);
   assert.equal(boardCardSize.columnWidth > 900, true);
   assert.equal(boardCardSize.width >= 300 && boardCardSize.width <= 310, true);
   assert.equal(boardCardSize.horizontalLayout, true);
