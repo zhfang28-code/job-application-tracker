@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260908-1')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260908-1'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260908-2')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260908-2'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260908-1'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260908-1'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260908-1'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260908-2'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20260908-2'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260908-2'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 
@@ -453,7 +453,7 @@ try {
     form.requestSubmit();
     return true;
   })()`);
-  await waitFor(client, "!document.querySelector('#progress-dialog').open && document.querySelector('#stat-presentation')?.textContent === '1'");
+  await waitFor(client, "!document.querySelector('#progress-dialog').open && document.querySelector('#stat-presentation')?.textContent === '1' && document.querySelector('#stat-ongoing')?.textContent === '1'");
   assert.deepEqual(await evaluate(client, `(() => {
     const payload = JSON.parse(localStorage.getItem('jobtrail.applications.v1'));
     const app = payload.applications.find((item) => item.company === '平川机械');
@@ -507,7 +507,7 @@ try {
   });
   await saveScreenshot(client, "completed-assessment-card-desktop.png");
 
-  const mutuallyExclusiveCounts = await evaluate(client, `(() => ({
+  const overviewCounts = await evaluate(client, `(() => ({
     total: Number(document.querySelector('#stat-total').textContent),
     ongoing: Number(document.querySelector('#stat-ongoing').textContent),
     presentation: Number(document.querySelector('#stat-presentation').textContent),
@@ -517,9 +517,9 @@ try {
     followUps: Number(document.querySelector('#nav-followup').textContent),
     closed: Number(document.querySelector('#nav-closed').textContent),
   }))()`);
-  assert.deepEqual(mutuallyExclusiveCounts, {
+  assert.deepEqual(overviewCounts, {
     total: 3,
-    ongoing: 0,
+    ongoing: 1,
     presentation: 1,
     assessment: 1,
     interviewing: 1,
@@ -528,14 +528,14 @@ try {
     closed: 0,
   });
   assert.equal(
-    mutuallyExclusiveCounts.ongoing
-      + mutuallyExclusiveCounts.presentation
-      + mutuallyExclusiveCounts.assessment
-      + mutuallyExclusiveCounts.interviewing
-      + mutuallyExclusiveCounts.offers
-      + mutuallyExclusiveCounts.closed,
-    mutuallyExclusiveCounts.total,
+    overviewCounts.ongoing
+      + overviewCounts.assessment
+      + overviewCounts.interviewing
+      + overviewCounts.offers
+      + overviewCounts.closed,
+    overviewCounts.total,
   );
+  assert.equal(overviewCounts.presentation <= overviewCounts.ongoing, true);
 
   await evaluate(client, "document.querySelector('[data-quick-filter=\"followup\"]').click(); true");
   await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelector('.application-card')?.textContent.includes('星河科技')");
@@ -618,6 +618,16 @@ try {
   assert.equal(await evaluate(client, "document.querySelector('[data-quick-filter=\"presentation\"]').classList.contains('is-active')"), true);
   await saveScreenshot(client, "summary-filter-presentation-desktop.png");
 
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"ongoing\"]').click(); true");
+  await waitFor(client, "document.querySelector('#visible-count')?.textContent === '1 个机会' && document.querySelector('.application-card')?.textContent.includes('平川机械')");
+  assert.deepEqual(
+    await evaluate(client, "[...document.querySelectorAll('.board-column')].map((item) => item.dataset.stageTarget)"),
+    ["applied", "offline-presentation"],
+  );
+  assert.equal(await evaluate(client, "document.querySelector('[data-quick-filter=\"ongoing\"]').classList.contains('is-active')"), true);
+  assert.equal(await evaluate(client, "document.querySelector('[data-summary-filter=\"presentation\"]').classList.contains('is-selected')"), false);
+  await saveScreenshot(client, "summary-filter-ongoing-includes-presentation-desktop.png");
+
   await evaluate(client, "document.querySelector('[data-summary-filter=\"interviewing\"]').click(); true");
   await waitFor(client, "document.querySelector('.application-card')?.textContent.includes('星河科技')");
 
@@ -655,7 +665,7 @@ try {
   });
   await saveScreenshot(client, "summary-filter-offer-desktop.png");
 
-  await evaluate(client, "document.querySelector('[data-summary-filter=\"presentation\"]').click(); true");
+  await evaluate(client, "document.querySelector('[data-summary-filter=\"ongoing\"]').click(); true");
   await waitFor(client, "document.querySelector('.application-card')?.textContent.includes('平川机械')");
   await evaluate(client, "document.querySelector('.application-card').click(); true");
   await waitFor(client, "document.querySelector('#detail-dialog').open && document.querySelector('#detail-content').textContent.includes('平川机械')");

@@ -20,9 +20,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260908-1";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260908-1";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260908-1";
+} from "./model.js?v=20260908-2";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260908-2";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260908-2";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -441,7 +441,9 @@ function outcomeColumn(application) {
 
 function baseBoardColumns(quickFilter = filters.quick) {
   if (quickFilter === "followup") return [FOLLOW_UP_COLUMN];
-  if (quickFilter === "ongoing") return STAGES.filter((stage) => stage.id === "applied");
+  if (quickFilter === "ongoing") {
+    return STAGES.filter((stage) => ["applied", "offline-presentation"].includes(stage.id));
+  }
   if (quickFilter === "presentation") return STAGES.filter((stage) => stage.id === "offline-presentation");
   if (quickFilter === "assessment") return STAGES.filter((stage) => stage.id === "assessment");
   if (quickFilter === "interviewing") {
@@ -676,7 +678,9 @@ function getFilteredApplications() {
     }
     if (filters.stage !== "all" && outcomeColumn(application) !== filters.stage) return false;
     if (filters.quick === "followup" && !hasScheduledFollowUp(application)) return false;
-    if (!["all", "followup"].includes(filters.quick) && applicationCategory(application) !== filters.quick) return false;
+    const category = applicationCategory(application);
+    if (filters.quick === "ongoing" && !["ongoing", "presentation"].includes(category)) return false;
+    if (!["all", "followup", "ongoing"].includes(filters.quick) && category !== filters.quick) return false;
     return true;
   }).sort((a, b) => filters.quick === "followup"
     ? a.nextFollowUp.localeCompare(b.nextFollowUp) || new Date(b.updatedAt) - new Date(a.updatedAt)
@@ -744,7 +748,7 @@ function renderBoard(items) {
       ? items
       : items.filter((application) => outcomeColumn(application) === column.id);
     return `
-      <section class="board-column" data-stage-target="${column.id}" style="--stage-color:${column.color}" aria-labelledby="column-${column.id}">
+      <section class="board-column${cards.length ? "" : " is-empty"}" data-stage-target="${column.id}" style="--stage-color:${column.color}" aria-labelledby="column-${column.id}">
         <header class="board-column-header">
           <span class="stage-dot"></span>
           <h3 id="column-${column.id}">${escapeHtml(column.label)}</h3>

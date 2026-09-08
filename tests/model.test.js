@@ -265,7 +265,7 @@ test("跟进日期在今天或之前时视为待跟进", () => {
   assert.equal(isFollowUpDue({ ...sample(), nextFollowUp: "2026-08-29", status: "rejected" }, today), false);
 });
 
-test("概览阶段互斥且跟进筛选可与阶段交叉", () => {
+test("概览主阶段互斥，线下宣讲属于进行中且跟进筛选可交叉", () => {
   const ongoing = sample({ nextFollowUp: "2026-09-10" });
   const presentation = moveToStage(sample({ company: "青禾" }), "offline-presentation", {}, NOW);
   const assessment = moveToStage(sample({ company: "远山" }), "assessment", {}, NOW);
@@ -285,7 +285,7 @@ test("概览阶段互斥且跟进筛选可与阶段交叉", () => {
   assert.deepEqual(summary, {
     total: 6,
     active: 4,
-    ongoing: 1,
+    ongoing: 2,
     presentation: 1,
     assessment: 1,
     interviewing: 1,
@@ -294,7 +294,8 @@ test("概览阶段互斥且跟进筛选可与阶段交叉", () => {
     followUps: 1,
     due: 0,
   });
-  assert.equal(summary.ongoing + summary.presentation + summary.assessment + summary.interviewing + summary.offers + summary.closed, summary.total);
+  assert.equal(summary.presentation <= summary.ongoing, true);
+  assert.equal(summary.ongoing + summary.assessment + summary.interviewing + summary.offers + summary.closed, summary.total);
 });
 
 test("导入合并时相同 ID 保留更新时间较新的版本", () => {

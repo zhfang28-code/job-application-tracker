@@ -643,6 +643,9 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
   align-items: start;
 }
 .pipeline-board.is-card-grid .column-empty { grid-column: 1 / -1; }
+.pipeline-board.is-card-grid .board-column.is-empty { min-height: 126px; }
+.pipeline-board.is-card-grid .board-column.is-empty .column-cards,
+.pipeline-board.is-card-grid .board-column.is-empty .column-empty { min-height: 54px; }
 
 .board-column {
   min-height: 370px;
