@@ -20,9 +20,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260903-8";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260903-8";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260903-8";
+} from "./model.js?v=20260908-1";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260908-1";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260908-1";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -46,11 +46,12 @@ let filters = {
   quick: "all",
 };
 
-const QUICK_FILTERS = new Set(["all", "followup", "ongoing", "assessment", "interviewing", "offer", "closed"]);
+const QUICK_FILTERS = new Set(["all", "followup", "ongoing", "presentation", "assessment", "interviewing", "offer", "closed"]);
 const QUICK_FILTER_TITLES = Object.freeze({
   all: "投递流程",
   followup: "需要跟进的投递",
   ongoing: "进行中的投递",
+  presentation: "线下宣讲",
   assessment: "测试阶段",
   interviewing: "面试阶段",
   offer: "收到 Offer",
@@ -441,6 +442,7 @@ function outcomeColumn(application) {
 function baseBoardColumns(quickFilter = filters.quick) {
   if (quickFilter === "followup") return [FOLLOW_UP_COLUMN];
   if (quickFilter === "ongoing") return STAGES.filter((stage) => stage.id === "applied");
+  if (quickFilter === "presentation") return STAGES.filter((stage) => stage.id === "offline-presentation");
   if (quickFilter === "assessment") return STAGES.filter((stage) => stage.id === "assessment");
   if (quickFilter === "interviewing") {
     return STAGES.filter((stage) => INTERVIEW_STAGE_IDS.has(stage.id));
@@ -735,7 +737,7 @@ function cardHtml(application) {
 
 function renderBoard(items) {
   const columns = currentBoardColumns();
-  elements.board.classList.toggle("is-card-grid", ["followup", "ongoing", "assessment"].includes(filters.quick));
+  elements.board.classList.toggle("is-card-grid", ["followup", "ongoing", "presentation", "assessment"].includes(filters.quick));
 
   elements.board.innerHTML = columns.map((column) => {
     const cards = filters.quick === "followup"
@@ -802,6 +804,7 @@ function renderSummary() {
   const summary = summarize(applications);
   $("#stat-total").textContent = summary.total;
   $("#stat-ongoing").textContent = summary.ongoing;
+  $("#stat-presentation").textContent = summary.presentation;
   $("#stat-assessment").textContent = summary.assessment;
   $("#stat-interviewing").textContent = summary.interviewing;
   $("#stat-offers").textContent = summary.offers;
@@ -809,6 +812,7 @@ function renderSummary() {
   $("#nav-followup").textContent = summary.followUps;
   $("#nav-followup").classList.toggle("is-alert", summary.followUps > 0);
   $("#nav-ongoing").textContent = summary.ongoing;
+  $("#nav-presentation").textContent = summary.presentation;
   $("#nav-assessment").textContent = summary.assessment;
   $("#nav-interviewing").textContent = summary.interviewing;
   $("#nav-offers").textContent = summary.offers;

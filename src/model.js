@@ -3,6 +3,7 @@ export const STORAGE_KEY = "jobtrail.applications.v1";
 
 export const STAGES = Object.freeze([
   { id: "applied", label: "已投递", shortLabel: "投递", color: "#5b6cf9" },
+  { id: "offline-presentation", label: "线下宣讲", shortLabel: "宣讲", color: "#db4d91" },
   { id: "assessment", label: "在线测试", shortLabel: "测评", color: "#8b5cf6" },
   { id: "ai-interview", label: "AI 面试", shortLabel: "AI 面", color: "#a855f7" },
   { id: "first-interview", label: "一面", shortLabel: "一面", color: "#0ea5e9" },
@@ -712,6 +713,7 @@ export function isFollowUpDue(application, today = new Date()) {
 function categoryForNormalizedApplication(application) {
   if (["rejected", "withdrawn"].includes(application.status)) return "closed";
   if (application.status === "offer" || application.currentStageId === "offer") return "offer";
+  if (application.currentStageId === "offline-presentation") return "presentation";
   if (application.currentStageId === "assessment") return "assessment";
   if (INTERVIEW_STAGE_IDS.has(application.currentStageId)) return "interviewing";
   return "ongoing";
@@ -725,6 +727,7 @@ export function summarize(applications) {
   const normalized = applications.map(normalizeApplication);
   const counts = {
     ongoing: 0,
+    presentation: 0,
     assessment: 0,
     interviewing: 0,
     offer: 0,
@@ -735,8 +738,9 @@ export function summarize(applications) {
   });
   return {
     total: normalized.length,
-    active: counts.ongoing + counts.assessment + counts.interviewing,
+    active: counts.ongoing + counts.presentation + counts.assessment + counts.interviewing,
     ongoing: counts.ongoing,
+    presentation: counts.presentation,
     assessment: counts.assessment,
     interviewing: counts.interviewing,
     offers: counts.offer,

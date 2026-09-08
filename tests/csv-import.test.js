@@ -56,6 +56,7 @@ test("状态与测评列会合并为当前阶段和结果", () => {
   assert.equal(mapCsvProgress("拒绝", "AI面").status, "rejected");
   assert.equal(mapCsvProgress("人才库", "").status, "rejected");
   assert.equal(mapCsvProgress("需线上测评", "").stageId, "assessment");
+  assert.equal(mapCsvProgress("校园线下宣讲会", "").stageId, "offline-presentation");
 });
 
 test("首次导入会创建动态流程并识别链接或邮箱", () => {

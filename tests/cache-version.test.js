@@ -29,10 +29,12 @@ test("新版概览所需的统计节点完整存在", async () => {
   for (const id of [
     "stat-total",
     "stat-ongoing",
+    "stat-presentation",
     "stat-assessment",
     "stat-interviewing",
     "stat-offers",
     "nav-followup",
+    "nav-presentation",
     "nav-closed",
     "open-job-link-button",
     "position-input",

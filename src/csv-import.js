@@ -5,7 +5,7 @@ import {
   normalizePipeline,
   stageById,
   toIsoDate,
-} from "./model.js?v=20260903-8";
+} from "./model.js?v=20260908-1";
 
 const HEADER_ALIASES = Object.freeze({
   company: ["单位", "公司", "公司名称", "投递公司"],
@@ -128,6 +128,7 @@ function stageFromText(value) {
     { stageId: "second-interview", pattern: /二面|第二轮面/ },
     { stageId: "first-interview", pattern: /一面|初面|第一轮面|群面/ },
     { stageId: "assessment", pattern: /线上测评|在线测评|测评|笔试|机试|作业|测试/ },
+    { stageId: "offline-presentation", pattern: /线下宣讲|校园宣讲|宣讲会|线下交流/ },
     { stageId: "applied", pattern: /已投递|投递完成|网申|简历筛选|人才库|拒绝|待筛选|已申请/ },
   ];
   return rules.find((rule) => rule.pattern.test(text))?.stageId ?? null;

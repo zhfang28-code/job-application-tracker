@@ -140,6 +140,19 @@ test("已投递默认完成，记录公司下一步时保留备注且不重复�
   assert.equal(updated.timeline.at(-1).note, "收到在线测评通知");
 });
 
+test("线下宣讲可作为独立的动态阶段加入招聘流程", () => {
+  const application = createApplication({ company: "云帆", position: "算法工程师" }, NOW);
+  const updated = completeCurrentStage(application, {
+    nextStageId: "offline-presentation",
+    note: "收到校园宣讲会通知",
+  }, NOW);
+
+  assert.equal(updated.currentStageId, "offline-presentation");
+  assert.deepEqual(updated.pipeline, ["applied", "offline-presentation", "offer"]);
+  assert.equal(updated.timeline.at(-1).note, "收到校园宣讲会通知");
+  assert.equal(applicationCategory(updated), "presentation");
+});
+
 test("可单独标记当前环节完成、保存跟进日期并在记录下一步时避免重复", () => {
   const application = moveToStage(sample(), "assessment", {}, NOW);
   const marked = markCurrentStageCompleted(application, {
@@ -205,7 +218,7 @@ test("跨阶段拖动会自动将中间环节记为跳过", () => {
   assert.equal(newEvents[0].type, "completed");
   assert.deepEqual(
     newEvents.filter((event) => event.type === "skipped").map((event) => event.stageId),
-    ["assessment", "ai-interview", "first-interview"],
+    ["offline-presentation", "assessment", "ai-interview", "first-interview"],
   );
   assert.equal(newEvents.at(-1).type, "entered");
 });
@@ -254,6 +267,7 @@ test("跟进日期在今天或之前时视为待跟进", () => {
 
 test("概览阶段互斥且跟进筛选可与阶段交叉", () => {
   const ongoing = sample({ nextFollowUp: "2026-09-10" });
+  const presentation = moveToStage(sample({ company: "青禾" }), "offline-presentation", {}, NOW);
   const assessment = moveToStage(sample({ company: "远山" }), "assessment", {}, NOW);
   const interviewing = setOutcome(
     moveToStage(sample({ company: "云帆" }), "ai-interview", {}, NOW),
@@ -263,15 +277,16 @@ test("概览阶段互斥且跟进筛选可与阶段交叉", () => {
   );
   const offered = completeCurrentStage(sample({ company: "北辰", pipeline: ["applied", "offer"] }), {}, NOW);
   const closed = setOutcome(sample({ company: "南星" }), "rejected", {}, NOW);
-  const applications = [ongoing, assessment, interviewing, offered, closed];
+  const applications = [ongoing, presentation, assessment, interviewing, offered, closed];
   const categories = applications.map(applicationCategory);
   const summary = summarize(applications);
 
-  assert.deepEqual(categories, ["ongoing", "assessment", "interviewing", "offer", "closed"]);
+  assert.deepEqual(categories, ["ongoing", "presentation", "assessment", "interviewing", "offer", "closed"]);
   assert.deepEqual(summary, {
-    total: 5,
-    active: 3,
+    total: 6,
+    active: 4,
     ongoing: 1,
+    presentation: 1,
     assessment: 1,
     interviewing: 1,
     offers: 1,
@@ -279,7 +294,7 @@ test("概览阶段互斥且跟进筛选可与阶段交叉", () => {
     followUps: 1,
     due: 0,
   });
-  assert.equal(summary.ongoing + summary.assessment + summary.interviewing + summary.offers + summary.closed, summary.total);
+  assert.equal(summary.ongoing + summary.presentation + summary.assessment + summary.interviewing + summary.offers + summary.closed, summary.total);
 });
 
 test("导入合并时相同 ID 保留更新时间较新的版本", () => {
