@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20260908-5" />
+    <link rel="stylesheet" href="./styles.css?v=20260924-1" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -155,9 +155,9 @@
                 <span class="overview-total-icon"><svg class="icon"><use href="#icon-building"></use></svg></span>
                 <span class="overview-total-copy"><small>全部投递</small><strong id="stat-total">0</strong><em id="stat-total-copy">开始记录第一份机会</em></span>
               </button>
-              <div class="mini-progress" aria-label="活跃投递占比">
+              <div class="mini-progress" aria-label="进行中投递占比">
                 <span id="active-ratio">0%</span>
-                <small>活跃占比</small>
+                <small>进行中占比</small>
               </div>
             </div>
           </div>
@@ -165,7 +165,7 @@
           <div class="stats-grid" role="group" aria-label="投递概览筛选">
             <button class="stat-card stat-active" type="button" data-summary-filter="ongoing" aria-pressed="false" aria-controls="pipeline-board">
               <div class="stat-icon"><svg class="icon"><use href="#icon-arrow"></use></svg></div>
-              <div><span>进行中</span><strong id="stat-ongoing">0</strong><small>已投递，等待公司下一步</small></div>
+              <div><span>进行中</span><strong id="stat-ongoing">0</strong><small>所有尚未结束的投递</small></div>
             </button>
             <button class="stat-card stat-presentation" type="button" data-summary-filter="presentation" aria-pressed="false" aria-controls="pipeline-board">
               <div class="stat-icon"><svg class="icon"><use href="#icon-presentation"></use></svg></div>
@@ -438,11 +438,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20260908-5", { updateViaCache: "none" })
+          .register("./sw.js?v=20260924-1", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20260908-5"></script>
+    <script type="module" src="./src/app.js?v=20260924-1"></script>
   </body>
 </html>

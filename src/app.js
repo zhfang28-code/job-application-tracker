@@ -21,9 +21,9 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260908-5";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260908-5";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260908-5";
+} from "./model.js?v=20260924-1";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260924-1";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260924-1";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -443,9 +443,7 @@ function outcomeColumn(application) {
 
 function baseBoardColumns(quickFilter = filters.quick) {
   if (quickFilter === "followup") return [FOLLOW_UP_COLUMN];
-  if (quickFilter === "ongoing") {
-    return STAGES.filter((stage) => ["applied", "offline-presentation"].includes(stage.id));
-  }
+  if (quickFilter === "ongoing") return STAGES;
   if (quickFilter === "presentation") return STAGES.filter((stage) => stage.id === "offline-presentation");
   if (quickFilter === "assessment") return STAGES.filter((stage) => stage.id === "assessment");
   if (quickFilter === "interviewing") {
@@ -478,10 +476,11 @@ function updateQuickFilterControls() {
 
 function applyQuickFilter(quickFilter, { scroll = true } = {}) {
   if (!QUICK_FILTERS.has(quickFilter)) return;
+  const filterChanged = filters.quick !== quickFilter;
   filters.quick = quickFilter;
 
   const availableColumns = new Set(baseBoardColumns(quickFilter).map((column) => column.id));
-  if (filters.stage !== "all" && !availableColumns.has(filters.stage)) {
+  if (filters.stage !== "all" && (filterChanged || !availableColumns.has(filters.stage))) {
     filters.stage = "all";
     elements.stageFilter.value = "all";
   }
@@ -681,7 +680,7 @@ function getFilteredApplications() {
     if (filters.stage !== "all" && outcomeColumn(application) !== filters.stage) return false;
     if (filters.quick === "followup" && !hasScheduledFollowUp(application)) return false;
     const category = applicationCategory(application);
-    if (filters.quick === "ongoing" && !["ongoing", "presentation"].includes(category)) return false;
+    if (filters.quick === "ongoing" && category === "closed") return false;
     if (!["all", "followup", "ongoing"].includes(filters.quick) && category !== filters.quick) return false;
     return true;
   }).sort((a, b) => filters.quick === "followup"
@@ -750,7 +749,7 @@ function cardHtml(application) {
 
 function renderBoard(items) {
   const columns = currentBoardColumns();
-  elements.board.classList.toggle("is-card-grid", ["followup", "ongoing", "presentation", "assessment"].includes(filters.quick));
+  elements.board.classList.toggle("is-card-grid", ["followup", "presentation", "assessment"].includes(filters.quick));
 
   elements.board.innerHTML = columns.map((column) => {
     const cards = filters.quick === "followup"
@@ -831,7 +830,7 @@ function renderSummary() {
   $("#nav-offers").textContent = summary.offers;
   $("#nav-closed").textContent = summary.closed;
   $("#active-ratio").textContent = summary.total ? `${Math.round((summary.active / summary.total) * 100)}%` : "0%";
-  $("#stat-total-copy").textContent = summary.total ? `其中 ${summary.active} 个仍在推进` : "开始记录第一份机会";
+  $("#stat-total-copy").textContent = summary.total ? `其中 ${summary.active} 个未结束` : "开始记录第一份机会";
 
   if (summary.total) {
     $("#welcome-heading").textContent = summary.offers ? "好消息正在路上" : "稳稳推进每一次机会";

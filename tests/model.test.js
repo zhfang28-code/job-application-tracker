@@ -293,8 +293,8 @@ test("跟进日期在今天或之前时视为待跟进", () => {
   assert.equal(isFollowUpDue({ ...sample(), nextFollowUp: "2026-08-29", status: "rejected" }, today), false);
 });
 
-test("概览主阶段互斥，线下宣讲属于进行中且跟进筛选可交叉", () => {
-  const ongoing = sample({ nextFollowUp: "2026-09-10" });
+test("全部投递等于进行中加已结束，子阶段与跟进筛选可交叉", () => {
+  const ongoing = sample({ nextFollowUp: "2099-09-10" });
   const presentation = moveToStage(sample({ company: "青禾" }), "offline-presentation", {}, NOW);
   const assessment = moveToStage(sample({ company: "远山" }), "assessment", {}, NOW);
   const interviewing = setOutcome(
@@ -312,8 +312,8 @@ test("概览主阶段互斥，线下宣讲属于进行中且跟进筛选可交�
   assert.deepEqual(categories, ["ongoing", "presentation", "assessment", "interviewing", "offer", "closed"]);
   assert.deepEqual(summary, {
     total: 6,
-    active: 4,
-    ongoing: 2,
+    active: 5,
+    ongoing: 5,
     presentation: 1,
     assessment: 1,
     interviewing: 1,
@@ -322,8 +322,9 @@ test("概览主阶段互斥，线下宣讲属于进行中且跟进筛选可交�
     followUps: 1,
     due: 0,
   });
-  assert.equal(summary.presentation <= summary.ongoing, true);
-  assert.equal(summary.ongoing + summary.assessment + summary.interviewing + summary.offers + summary.closed, summary.total);
+  assert.equal(summary.presentation + summary.assessment + summary.interviewing + summary.offers <= summary.ongoing, true);
+  assert.equal(summary.total, summary.ongoing + summary.closed);
+  assert.equal(summary.active, summary.ongoing);
 });
 
 test("导入合并时相同 ID 保留更新时间较新的版本", () => {

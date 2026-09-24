@@ -767,8 +767,8 @@ export function summarize(applications) {
   });
   return {
     total: normalized.length,
-    active: counts.ongoing + counts.presentation + counts.assessment + counts.interviewing,
-    ongoing: counts.ongoing + counts.presentation,
+    active: normalized.length - counts.closed,
+    ongoing: normalized.length - counts.closed,
     presentation: counts.presentation,
     assessment: counts.assessment,
     interviewing: counts.interviewing,
