@@ -21,9 +21,10 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20260924-1";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20260924-1";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20260924-1";
+} from "./model.js?v=20261011-1";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20261011-1";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20261011-1";
+import { extractRecruitmentFields } from "./image-import.js?v=20261011-1";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -102,6 +103,180 @@ const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
   hour12: false,
 });
 const DEFAULT_JOB_LINK_ANALYSIS_COPY = "粘贴后可直接打开链接；公司信息只在本地分析。";
+const imageImportState = { requestId: 0, controller: null, previewUrl: "" };
+
+function setImageImportStatus(message, state = "") {
+  const status = $("#image-import-status");
+  status.textContent = message;
+  status.classList.toggle("is-error", state === "error");
+  status.classList.toggle("is-success", state === "success");
+}
+
+function setImageImportBusy(busy) {
+  $("#image-import-panel").setAttribute("aria-busy", String(busy));
+  $("#image-import-progress").hidden = !busy;
+  $("#apply-recruitment-image-button").disabled = busy;
+  $("#reparse-recruitment-text-button").disabled = busy;
+}
+
+function clearImageImport() {
+  imageImportState.requestId += 1;
+  imageImportState.controller?.abort();
+  imageImportState.controller = null;
+  if (imageImportState.previewUrl) URL.revokeObjectURL(imageImportState.previewUrl);
+  imageImportState.previewUrl = "";
+  const preview = $("#recruitment-image-preview");
+  preview.removeAttribute("src");
+  preview.hidden = true;
+  $("#recruitment-image-file").value = "";
+  $("#recruitment-image-dropzone").classList.remove("is-dragover");
+  $("#clear-recruitment-image-button").hidden = true;
+  $("#image-import-result").hidden = true;
+  $("#image-import-company").value = "";
+  $("#image-import-company-selected").checked = false;
+  $("#image-import-text").value = "";
+  $("#image-import-address").value = "";
+  $("#image-import-address-field").hidden = true;
+  $("#image-import-city-list").replaceChildren();
+  $("#image-import-position-list").replaceChildren();
+  $(".image-import-source").open = false;
+  $("#image-import-progress").value = 0;
+  setImageImportBusy(false);
+  setImageImportStatus("图片仅在本机识别；首次使用需加载识别资源。");
+}
+
+function renderImageImportResult(text) {
+  const result = extractRecruitmentFields(text);
+  $("#image-import-company").value = result.company;
+  $("#image-import-company-selected").checked = Boolean(result.company);
+  $("#image-import-text").value = text;
+  for (const [kind, values] of [["city", result.cities], ["position", result.positions]]) {
+    const config = CUSTOM_FORM_OPTION_FIELDS[kind];
+    $(`#image-import-${kind}-list`).innerHTML = values.length
+      ? values.map((value, index) => `<label class="image-import-candidate"><input type="checkbox" checked aria-label="选择${config.label} ${index + 1}" /><input type="text" value="${escapeHtml(value)}" maxlength="${config.maxLength}" autocomplete="off" aria-label="识别的${config.label} ${index + 1}" /></label>`).join("")
+      : `<p class="image-import-empty">未识别出${config.label}，可在下方表单手动填写。</p>`;
+  }
+  $("#image-import-address").value = result.address;
+  $("#image-import-address-selected").checked = Boolean(result.address);
+  $("#image-import-address-field").hidden = !result.address;
+  $("#image-import-result").hidden = false;
+  const anyField = result.company || result.cities.length || result.positions.length || result.address;
+  setImageImportStatus(anyField ? "识别完成，核对并选择需要的内容后点击“填入表单”。" : "已识别文字，但未能提取招聘字段。可修正识别文字后重新提取。", anyField ? "success" : "");
+}
+
+async function importRecruitmentImage(file) {
+  if (!file || !file.type.startsWith("image/") || file.type === "image/svg+xml") {
+    setImageImportStatus("请粘贴或选择 PNG、JPG 或 WebP 图片。", "error");
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    setImageImportStatus("图片超过 20 MB，请先裁剪或压缩后再试。", "error");
+    return;
+  }
+  clearImageImport();
+  const requestId = imageImportState.requestId;
+  const controller = new AbortController();
+  imageImportState.controller = controller;
+  imageImportState.previewUrl = URL.createObjectURL(file);
+  const preview = $("#recruitment-image-preview");
+  preview.src = imageImportState.previewUrl;
+  preview.hidden = false;
+  $("#clear-recruitment-image-button").hidden = false;
+  setImageImportBusy(true);
+  setImageImportStatus("正在读取图片…");
+  try {
+    const { recognizeRecruitmentImage } = await import("./image-ocr.js?v=20261011-1");
+    const result = await recognizeRecruitmentImage(file, {
+      signal: controller.signal,
+      onProgress({ value, label }) {
+        if (requestId !== imageImportState.requestId) return;
+        $("#image-import-progress").value = value;
+        setImageImportStatus(label);
+      },
+    });
+    if (requestId !== imageImportState.requestId || !elements.applicationDialog.open) return;
+    if (!result.text) {
+      setImageImportStatus("没有识别到文字，请裁剪招聘信息区域，使用更清晰的截图重试。", "error");
+      return;
+    }
+    renderImageImportResult(result.text);
+  } catch (error) {
+    if (requestId !== imageImportState.requestId || error.name === "AbortError") return;
+    setImageImportStatus(`识别未完成：${error.message || "请检查网络后重新粘贴图片"}`, "error");
+  } finally {
+    if (requestId === imageImportState.requestId) {
+      imageImportState.controller = null;
+      setImageImportBusy(false);
+    }
+  }
+}
+
+async function pasteRecruitmentImage() {
+  const requestId = imageImportState.requestId;
+  if (!navigator.clipboard?.read) {
+    $("#recruitment-image-dropzone").focus();
+    setImageImportStatus("请在此窗口按 Ctrl + V 粘贴图片，或点击“选择图片”。");
+    return;
+  }
+  try {
+    const items = await navigator.clipboard.read();
+    if (requestId !== imageImportState.requestId || !elements.applicationDialog.open) return;
+    for (const item of items) {
+      const type = item.types.find((value) => value.startsWith("image/") && value !== "image/svg+xml");
+      if (type) {
+        const file = await item.getType(type);
+        if (requestId !== imageImportState.requestId || !elements.applicationDialog.open) return;
+        await importRecruitmentImage(file);
+        return;
+      }
+    }
+    setImageImportStatus("剪贴板中没有图片。请先复制招聘截图，再粘贴或选择图片。", "error");
+  } catch {
+    if (requestId !== imageImportState.requestId) return;
+    $("#recruitment-image-dropzone").focus();
+    setImageImportStatus("请直接按 Ctrl + V 粘贴图片，或点击“选择图片”。");
+  }
+}
+
+function applyImageImportResult() {
+  if (imageImportState.controller || $("#image-import-result").hidden) return;
+  const company = $("#image-import-company-selected").checked ? $("#image-import-company").value.trim() : "";
+  const address = $("#image-import-address-selected").checked ? $("#image-import-address").value.trim() : "";
+  const fields = {};
+  try {
+    if (company.length > 80) throw new Error("公司名称不能超过 80 个字符");
+    for (const kind of ["city", "position"]) {
+      const candidates = [...$(`#image-import-${kind}-list`).querySelectorAll(".image-import-candidate")]
+        .filter((row) => row.querySelector('input[type="checkbox"]').checked)
+        .map((row) => row.querySelector('input[type="text"]').value.trim())
+        .filter(Boolean);
+      const config = CUSTOM_FORM_OPTION_FIELDS[kind];
+      const pending = splitMultiValueEntries($(`[data-multi-value-entry="${kind}"]`).value);
+      const values = [...selectedMultiValues(kind), ...pending, ...candidates];
+      if (values.some((item) => item.length > config.maxLength)) throw new Error(`每个${config.label}不能超过 ${config.maxLength} 个字符，请修正识别结果`);
+      const uniqueValues = [...new Map(values.map((item) => [customOptionKey(item), item])).values()];
+      if (uniqueValues.length > MULTI_VALUE_LIMIT) throw new Error(`每条投递最多添加 ${MULTI_VALUE_LIMIT} 个${config.label}，请取消不需要的选项`);
+      fields[kind] = { values: uniqueValues, count: candidates.length };
+    }
+    if (!company && !address && !fields.city.count && !fields.position.count) throw new Error("请至少选择一项需要填入的信息");
+    const noteLine = address ? `工作地址：${address}` : "";
+    const previousNotes = elements.applicationForm.elements.notes.value.trim();
+    const notes = !noteLine || previousNotes.includes(noteLine) ? previousNotes : [previousNotes, noteLine].filter(Boolean).join("\n");
+    if (notes.length > 1200) throw new Error("地址与原有备注合计超过 1200 个字符，请缩短后再填入");
+    if (company) {
+      elements.applicationForm.elements.company.value = company;
+      delete elements.applicationForm.elements.company.dataset.inferredCompany;
+    }
+    for (const kind of ["city", "position"]) {
+      setSelectedMultiValues(kind, fields[kind].values, { clearEntry: true });
+    }
+    elements.applicationForm.elements.notes.value = notes;
+    setImageImportStatus("已填入下方表单，请核对后点击“保存投递”。", "success");
+    showToast("图片信息已填入表单");
+  } catch (error) {
+    setImageImportStatus(error.message, "error");
+  }
+}
 
 function customOptionKey(value) {
   return String(value ?? "").trim().toLocaleLowerCase("zh-CN");
@@ -620,6 +795,7 @@ function applicationFormPayload(form) {
 }
 
 function openApplicationForm(application = null) {
+  clearImageImport();
   elements.applicationForm.reset();
   for (const kind of Object.keys(CUSTOM_FORM_OPTION_FIELDS)) {
     $(`[data-multi-value-entry="${kind}"]`).setCustomValidity("");
@@ -1162,6 +1338,45 @@ function initializeTheme() {
 function setupEventListeners() {
   $("#add-application-button").addEventListener("click", () => openApplicationForm());
   $("#empty-action").addEventListener("click", () => applications.length ? resetFilters() : openApplicationForm());
+  $("#paste-recruitment-image-button").addEventListener("click", pasteRecruitmentImage);
+  $("#choose-recruitment-image-button").addEventListener("click", () => $("#recruitment-image-file").click());
+  $("#recruitment-image-file").addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) void importRecruitmentImage(file);
+  });
+  $("#clear-recruitment-image-button").addEventListener("click", clearImageImport);
+  $("#apply-recruitment-image-button").addEventListener("click", applyImageImportResult);
+  $("#reparse-recruitment-text-button").addEventListener("click", () => renderImageImportResult($("#image-import-text").value));
+  $("#image-import-company").addEventListener("input", (event) => {
+    $("#image-import-company-selected").checked = Boolean(event.target.value.trim());
+  });
+  elements.applicationDialog.addEventListener("close", clearImageImport);
+  elements.applicationDialog.addEventListener("paste", (event) => {
+    const item = [...(event.clipboardData?.items ?? [])].find((entry) => entry.kind === "file" && entry.type.startsWith("image/"));
+    const file = item?.getAsFile() ?? [...(event.clipboardData?.files ?? [])].find((entry) => entry.type.startsWith("image/"));
+    if (!file) return;
+    event.preventDefault();
+    void importRecruitmentImage(file);
+  });
+  const imageDropzone = $("#recruitment-image-dropzone");
+  imageDropzone.addEventListener("click", () => $("#recruitment-image-file").click());
+  imageDropzone.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    $("#recruitment-image-file").click();
+  });
+  imageDropzone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    imageDropzone.classList.add("is-dragover");
+  });
+  imageDropzone.addEventListener("dragleave", () => imageDropzone.classList.remove("is-dragover"));
+  imageDropzone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    imageDropzone.classList.remove("is-dragover");
+    const file = [...event.dataTransfer.files].find((entry) => entry.type.startsWith("image/"));
+    if (file) void importRecruitmentImage(file);
+    else setImageImportStatus("请拖入一张招聘截图。", "error");
+  });
   elements.analyzeJobLinkButton.addEventListener("click", () => analyzeCompanyFromJobUrl({ announce: true }));
   elements.openJobLinkButton.addEventListener("click", (event) => {
     if (elements.openJobLinkButton.getAttribute("aria-disabled") === "true") event.preventDefault();
@@ -1225,6 +1440,10 @@ function setupEventListeners() {
   });
   elements.applicationForm.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || event.isComposing) return;
+    if (event.target.closest(".image-import-panel") && event.target.matches('input[type="text"]')) {
+      event.preventDefault();
+      return;
+    }
     const multiValueEntry = event.target.closest("[data-multi-value-entry]");
     if (multiValueEntry) {
       event.preventDefault();

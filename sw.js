@@ -1,4 +1,4 @@
-const RELEASE = "20260924-1";
+const RELEASE = "20261011-1";
 const CACHE_NAME = `jobtrail-static-${RELEASE}`;
 const versioned = (path) => `${path}?v=${RELEASE}`;
 const APP_SHELL = [
@@ -11,6 +11,8 @@ const APP_SHELL = [
   versioned("./src/model.js"),
   versioned("./src/storage.js"),
   versioned("./src/csv-import.js"),
+  versioned("./src/image-import.js"),
+  versioned("./src/image-ocr.js"),
 ];
 
 self.addEventListener("install", (event) => {

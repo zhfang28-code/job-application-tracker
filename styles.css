@@ -937,6 +937,48 @@ dialog::backdrop {
 .field-hint.is-success { color: var(--green); }
 .field-hint.is-warning { color: var(--orange); }
 
+.image-import-panel { margin-bottom: 20px; padding: 15px; border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--primary-soft) 35%, var(--surface)); }
+.image-import-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.image-import-title { display: flex; align-items: center; gap: 9px; }
+.image-import-title > .icon { width: 26px; height: 26px; color: var(--primary); }
+.image-import-title strong { display: block; color: var(--text); font-size: 13px; }
+.image-import-title small { display: block; margin-top: 2px; color: var(--text-soft); font-size: 10px; }
+.image-import-buttons { display: flex; gap: 7px; }
+.image-import-buttons .field-inline-button { min-width: 82px; min-height: 34px; font-size: 11px; }
+.image-import-dropzone { display: flex; min-height: 54px; align-items: center; justify-content: center; gap: 14px; margin-top: 12px; padding: 10px; border: 1px dashed var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--text-soft); font-size: 11px; cursor: pointer; }
+.image-import-dropzone:focus-visible, .image-import-dropzone.is-dragover { outline: 2px solid var(--primary); outline-offset: 2px; border-color: var(--primary); background: var(--primary-soft); }
+.image-import-dropzone img { display: block; max-width: 170px; max-height: 105px; object-fit: contain; border-radius: 5px; }
+.image-import-panel [hidden] { display: none !important; }
+.image-import-status-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.image-import-status-row p { margin: 8px 0 0; color: var(--text-faint); font-size: 10px; }
+.image-import-status-row p.is-error { color: var(--red); }
+.image-import-status-row p.is-success { color: var(--green); }
+.image-import-clear { flex-shrink: 0; padding: 3px 0; border: 0; background: transparent; color: var(--text-soft); font-size: 10px; text-decoration: underline; cursor: pointer; }
+.image-import-panel progress { display: block; width: 100%; height: 7px; margin-top: 10px; accent-color: var(--primary); }
+.image-import-result { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.image-import-result-heading { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.image-import-result-heading strong { font-size: 13px; }
+.image-import-result-heading span { color: var(--text-soft); font-size: 10px; }
+.image-import-company { margin-bottom: 13px; }
+.image-import-company > span, .image-import-address > span { display: flex; align-items: center; gap: 7px; }
+.image-import-panel input[type="checkbox"] { width: 15px; height: 15px; margin: 0; flex: 0 0 auto; accent-color: var(--primary); }
+.image-import-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 14px; }
+.image-import-fields > div > strong { color: var(--text-soft); font-size: 11px; }
+.image-import-candidates { display: grid; max-height: 184px; gap: 6px; margin-top: 6px; overflow-y: auto; scrollbar-width: thin; }
+.image-import-candidate { display: flex; align-items: center; gap: 7px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.image-import-candidate input[type="text"] { width: 100%; min-width: 0; height: 26px; padding: 1px 3px; border: 0; outline: 0; border-radius: 4px; background: transparent; color: var(--text); font-size: 11px; }
+.image-import-candidate input[type="text"]:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent); }
+.image-import-empty { margin: 0; padding: 9px; border: 1px dashed var(--line); border-radius: 7px; color: var(--text-faint); font-size: 10px; }
+.image-import-address { margin-top: 12px; }
+.image-import-source { margin-top: 14px; color: var(--text-soft); font-size: 11px; }
+.image-import-source summary { cursor: pointer; }
+.image-import-source .form-field { margin: 8px 0; }
+.image-import-source .field-inline-button { min-height: 30px; font-size: 10px; }
+.image-import-result-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; }
+.image-import-result-footer small { color: var(--text-soft); font-size: 10px; }
+.image-import-result-footer .button { min-height: 36px; white-space: nowrap; }
+.image-import-panel button:disabled { cursor: wait; opacity: 0.5; }
+
 .import-source-tag { border-color: color-mix(in srgb, var(--primary) 28%, var(--line)); color: var(--primary); }
 
 .dynamic-flow-note { display: flex; gap: 13px; padding: 15px; border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--primary) 5%, var(--surface-soft)); }

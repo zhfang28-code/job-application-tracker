@@ -43,6 +43,7 @@ jobs:
           mkdir _site
           cp index.html styles.css icon.svg manifest.webmanifest sw.js _site/
           cp -r src _site/src
+          cp -r vendor _site/vendor
       - name: Upload static site
         uses: actions/upload-pages-artifact@v5
         with:

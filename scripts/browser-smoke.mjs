@@ -109,13 +109,13 @@ try {
   });
   await client.send("Page.navigate", { url: appUrl });
   await waitFor(client, "document.readyState === 'complete' && document.documentElement.dataset.appReady === 'true'");
-  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20260924-1')", 10000);
-  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20260924-1'))", 10000);
+  await waitFor(client, "navigator.serviceWorker.controller?.scriptURL.includes('v=20261011-1')", 10000);
+  await waitFor(client, "caches.keys().then((keys) => keys.filter((key) => key.startsWith('jobtrail-static-')).length === 1 && keys.includes('jobtrail-static-20261011-1'))", 10000);
 
   const releaseAssets = await evaluate(client, `(() => ({
-    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20260924-1'),
-    module: document.querySelector('script[type="module"]')?.src.includes('v=20260924-1'),
-    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20260924-1'),
+    stylesheet: document.querySelector('link[rel="stylesheet"]')?.href.includes('v=20261011-1'),
+    module: document.querySelector('script[type="module"]')?.src.includes('v=20261011-1'),
+    worker: navigator.serviceWorker.controller?.scriptURL.includes('v=20261011-1'),
   }))()`);
   assert.deepEqual(releaseAssets, { stylesheet: true, module: true, worker: true });
 

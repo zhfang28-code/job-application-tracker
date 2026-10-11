@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20260924-1" />
+    <link rel="stylesheet" href="./styles.css?v=20261011-1" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -46,6 +46,7 @@
       <symbol id="icon-edit" viewBox="0 0 24 24"><path d="m4 20 4.2-1 10.5-10.5a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.3-13.1 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 14H7L6 7m4 4v6m4-6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4.2 4.2L19 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><path d="m4 17 5-5 4 4 3-3 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     </svg>
 
     <div class="app-shell">
@@ -261,6 +262,40 @@
           <input type="hidden" name="applicationId" />
           <div class="form-section">
             <div class="form-section-title"><span>01</span><div><h3>岗位信息</h3><p>带 * 为必填项</p></div></div>
+            <section class="image-import-panel" id="image-import-panel" aria-label="从招聘截图识别信息" aria-busy="false">
+              <div class="image-import-toolbar">
+                <div class="image-import-title"><svg class="icon"><use href="#icon-image"></use></svg><div><strong>从招聘截图填写</strong><small>粘贴图片，识别公司、工作地点和岗位</small></div></div>
+                <div class="image-import-buttons">
+                  <button type="button" class="field-inline-button" id="paste-recruitment-image-button">粘贴图片</button>
+                  <button type="button" class="field-inline-button field-open-link-button" id="choose-recruitment-image-button">选择图片</button>
+                </div>
+              </div>
+              <input type="file" id="recruitment-image-file" accept="image/png,image/jpeg,image/webp,image/bmp" hidden />
+              <div class="image-import-dropzone" id="recruitment-image-dropzone" tabindex="0" role="button" aria-label="粘贴或拖入招聘截图，也可按 Enter 选择图片">
+                <img id="recruitment-image-preview" alt="待识别的招聘截图" hidden />
+                <span>在此按 Ctrl + V，或拖入一张招聘截图</span>
+              </div>
+              <div class="image-import-status-row">
+                <p id="image-import-status" role="status" aria-live="polite">图片仅在本机识别；首次使用需加载识别资源。</p>
+                <button type="button" class="image-import-clear" id="clear-recruitment-image-button" hidden>清除图片</button>
+              </div>
+              <progress id="image-import-progress" max="1" value="0" aria-label="图片识别进度" hidden></progress>
+              <div class="image-import-result" id="image-import-result" hidden>
+                <div class="image-import-result-heading"><strong>核对识别结果</strong><span>可修改文字，取消不需要的选项</span></div>
+                <label class="image-import-company form-field"><span><input type="checkbox" id="image-import-company-selected" />公司名称</span><input type="text" id="image-import-company" maxlength="80" autocomplete="off" placeholder="未识别出公司名称，可手动补充" /></label>
+                <div class="image-import-fields">
+                  <div><strong>城市 / 工作地点</strong><div class="image-import-candidates" id="image-import-city-list"></div></div>
+                  <div><strong>招聘岗位 / 专业</strong><div class="image-import-candidates" id="image-import-position-list"></div></div>
+                </div>
+                <label class="image-import-address form-field" id="image-import-address-field" hidden><span><input type="checkbox" id="image-import-address-selected" />将详细工作地址补充到备注</span><textarea id="image-import-address" rows="2" maxlength="1000" autocomplete="off"></textarea></label>
+                <details class="image-import-source">
+                  <summary>查看或修正识别文字</summary>
+                  <label class="form-field"><span class="sr-only">图片识别的原始文字</span><textarea id="image-import-text" rows="5" maxlength="12000" autocomplete="off"></textarea></label>
+                  <button type="button" class="field-inline-button" id="reparse-recruitment-text-button">重新提取字段</button>
+                </details>
+                <div class="image-import-result-footer"><small>公司名称会填入下方；岗位和城市会追加到已选项。</small><button type="button" class="button button-primary" id="apply-recruitment-image-button"><svg class="icon"><use href="#icon-check"></use></svg>填入表单</button></div>
+              </div>
+            </section>
             <div class="form-grid two-columns">
               <div class="form-field form-field-wide">
                 <label for="job-url-input">投递链接 / 邮箱</label>
@@ -438,11 +473,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20260924-1", { updateViaCache: "none" })
+          .register("./sw.js?v=20261011-1", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20260924-1"></script>
+    <script type="module" src="./src/app.js?v=20261011-1"></script>
   </body>
 </html>
