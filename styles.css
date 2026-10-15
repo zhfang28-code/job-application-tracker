@@ -699,12 +699,19 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
 .card-more { display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-faint); cursor: pointer; }
 .card-more:hover { background: var(--surface-soft); color: var(--text); }
 .card-more .icon { width: 19px; height: 19px; }
+.card-actions { display: flex; flex: 0 0 auto; gap: 2px; }
+.card-delete { display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--red); cursor: pointer; }
+.card-delete:hover { background: var(--red-soft); }
+.card-delete .icon { width: 16px; height: 16px; }
+.card-delete:focus-visible, .table-delete:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
 .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 15px; }
 .tag { max-width: 100%; padding: 3px 8px; overflow: hidden; border-radius: 6px; background: var(--surface-soft); color: var(--text-soft); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .tag.stage-tag { background: color-mix(in srgb, var(--stage-color, var(--primary)) 10%, var(--surface)); color: var(--stage-color, var(--primary)); font-weight: 650; }
-.tag.completed-stage-tag { display: inline-flex; align-items: center; gap: 3px; background: var(--green-soft); color: var(--green); font-weight: 700; }
-.completed-stage-tag .icon { width: 11px; height: 11px; }
+.tag.stage-completion-tag { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.tag.completed-stage-tag { background: var(--green-soft); color: var(--green); }
+.tag.pending-stage-tag { background: var(--orange-soft); color: var(--orange); }
+.stage-completion-tag .icon { width: 12px; height: 12px; }
 .tag.overdue-tag { background: var(--orange-soft); color: var(--orange); }
 .tag.status-tag { background: var(--red-soft); color: var(--red); }
 
@@ -755,7 +762,7 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
 .quick-progress:hover { border-color: color-mix(in srgb, var(--primary) 35%, var(--line)); background: var(--primary-soft); color: var(--primary); }
 
 .list-view {
-  overflow: hidden;
+  overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
@@ -779,6 +786,11 @@ html[data-theme="dark"] .theme-icon-light { display: none; }
 .table-progress .progress-track { width: 62px; margin: 0; }
 .table-link { color: var(--primary); text-decoration: none; }
 .table-link:hover { text-decoration: underline; }
+.table-completion { white-space: nowrap; }
+.application-table th:not(:first-child) { white-space: nowrap; }
+.table-delete { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 30px; padding: 4px 8px; border: 1px solid color-mix(in srgb, var(--red) 25%, var(--line)); border-radius: 7px; background: var(--surface); color: var(--red); font-size: 11px; font-weight: 650; white-space: nowrap; cursor: pointer; }
+.table-delete:hover { border-color: var(--red); background: var(--red-soft); }
+.table-delete .icon { width: 13px; height: 13px; }
 
 .empty-state {
   display: grid;

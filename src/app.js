@@ -21,10 +21,10 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20261011-1";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20261011-1";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20261011-1";
-import { extractRecruitmentFields } from "./image-import.js?v=20261011-1";
+} from "./model.js?v=20261015-1";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20261015-1";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20261015-1";
+import { extractRecruitmentFields } from "./image-import.js?v=20261015-1";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -185,7 +185,7 @@ async function importRecruitmentImage(file) {
   setImageImportBusy(true);
   setImageImportStatus("正在读取图片…");
   try {
-    const { recognizeRecruitmentImage } = await import("./image-ocr.js?v=20261011-1");
+    const { recognizeRecruitmentImage } = await import("./image-ocr.js?v=20261015-1");
     const result = await recognizeRecruitmentImage(file, {
       signal: controller.signal,
       onProgress({ value, label }) {
@@ -864,9 +864,32 @@ function getFilteredApplications() {
     : new Date(b.updatedAt) - new Date(a.updatedAt));
 }
 
+function stageCompletionHtml(application, { includeOtherCompleted = false } = {}) {
+  if (application.status !== "active") return "";
+  const isAssessmentOrInterview = application.currentStageId === "assessment"
+    || INTERVIEW_STAGE_IDS.has(application.currentStageId);
+  const completed = isCurrentStageCompleted(application);
+  if (!isAssessmentOrInterview && !(includeOtherCompleted && completed)) return "";
+  const label = completed ? "已完成" : "未完成";
+  return `<span class="tag stage-completion-tag ${completed ? "completed-stage-tag" : "pending-stage-tag"}" title="${escapeHtml(stageById(application.currentStageId).label)}：${label}">${icon(completed ? "check" : "clock")}${label}</span>`;
+}
+
+function deleteApplicationRecord(applicationId) {
+  const application = applications.find((item) => item.id === applicationId);
+  if (!application) return;
+  const confirmed = window.confirm(`确定删除「${application.company} · ${application.position}」这条投递记录吗？删除后只能通过此前导出的备份恢复。`);
+  if (!confirmed) return;
+  applications = applications.filter((item) => item.id !== application.id);
+  if (activeDetailId === application.id) {
+    activeDetailId = null;
+    elements.detailDialog.close();
+  }
+  persist("投递记录已删除");
+  renderAll();
+}
+
 function cardHtml(application) {
   const stage = stageById(application.currentStageId);
-  const currentStageCompleted = isCurrentStageCompleted(application);
   const overdue = isFollowUpDue(application);
   const closed = ["rejected", "withdrawn"].includes(application.status);
   const progress = applicationProgress(application);
@@ -902,11 +925,14 @@ function cardHtml(application) {
       <div class="card-top">
         <span class="company-avatar" style="${avatarStyle(application.company)}">${escapeHtml(companyInitial(application.company))}</span>
         <div class="card-title"><h4>${escapeHtml(application.company)}</h4><p>${escapeHtml(application.position)}</p></div>
-        <button class="card-more" type="button" data-action="details" data-id="${application.id}" aria-label="查看详情">${icon("more")}</button>
+        <div class="card-actions">
+          <button class="card-more" type="button" data-action="details" data-id="${application.id}" aria-label="查看详情">${icon("more")}</button>
+          <button class="card-delete" type="button" data-action="delete" data-id="${application.id}" aria-label="删除${escapeHtml(application.company)}的投递记录" title="删除这条投递记录">${icon("trash")}</button>
+        </div>
       </div>
       <div class="card-tags">
         <span class="tag stage-tag" style="${stageStyle(stage.id)}">${escapeHtml(stage.label)}</span>
-        ${currentStageCompleted ? `<span class="tag completed-stage-tag">${icon("check")}已完成</span>` : ""}
+        ${stageCompletionHtml(application, { includeOtherCompleted: true })}
         ${overdue ? `<span class="tag overdue-tag">待跟进</span>` : ""}
         ${statusTag}
         ${importTag}
@@ -948,7 +974,7 @@ function renderBoard(items) {
 function renderList(items) {
   elements.list.innerHTML = `
     <table class="application-table">
-      <thead><tr><th>公司 / 岗位</th><th>城市</th><th>当前进度</th><th>投递日期</th><th>流程完成度</th><th>链接 / 邮箱</th></tr></thead>
+      <thead><tr><th>公司 / 岗位</th><th>城市</th><th>当前进度</th><th>本环节完成情况</th><th>投递日期</th><th>流程完成度</th><th>链接 / 邮箱</th><th>操作</th></tr></thead>
       <tbody>
         ${items.map((application) => {
           const stage = stageById(application.currentStageId);
@@ -958,9 +984,11 @@ function renderList(items) {
             <td><div class="table-company"><span class="company-avatar" style="${avatarStyle(application.company)}">${escapeHtml(companyInitial(application.company))}</span><span><strong>${escapeHtml(application.company)}</strong><small>${escapeHtml(application.position)}</small></span></div></td>
             <td>${escapeHtml(application.city || "—")}</td>
             <td><span class="table-stage" style="${stageStyle(stage.id)}"><i class="stage-dot"></i>${escapeHtml(statusLabel(application))}</span></td>
+            <td class="table-completion">${stageCompletionHtml(application) || "—"}</td>
             <td>${formatDate(application.appliedAt, fullDateFormatter)}</td>
             <td><span class="table-progress"><span class="progress-track" style="${stageStyle(stage.id)}"><span style="width:${progress}%"></span></span>${progress}%</span></td>
             <td>${target.href ? `<a class="table-link" href="${escapeHtml(target.href)}" ${target.kind === "url" ? "target=\"_blank\" rel=\"noopener noreferrer\"" : ""} data-stop-detail>${escapeHtml(target.kind === "email" ? "发送邮件" : "查看链接")}</a>` : escapeHtml(target.value || "—")}</td>
+            <td><button class="table-delete" type="button" data-action="delete" data-id="${application.id}" aria-label="删除${escapeHtml(application.company)}的投递记录">${icon("trash")}删除</button></td>
           </tr>`;
         }).join("")}
       </tbody>
@@ -1582,6 +1610,7 @@ function setupEventListeners() {
       const applicationId = actionButton.dataset.id;
       if (actionButton.dataset.action === "progress") openProgress(applicationId);
       if (actionButton.dataset.action === "details") openDetail(applicationId);
+      if (actionButton.dataset.action === "delete") deleteApplicationRecord(applicationId);
       return;
     }
     const opener = event.target.closest("[data-open-detail]");
@@ -1617,13 +1646,7 @@ function setupEventListeners() {
       }
     }
     if (action === "delete") {
-      const confirmed = window.confirm(`确定删除「${application.company} · ${application.position}」吗？删除后只能通过此前导出的备份恢复。`);
-      if (!confirmed) return;
-      applications = applications.filter((item) => item.id !== application.id);
-      persist("投递记录已删除");
-      activeDetailId = null;
-      elements.detailDialog.close();
-      renderAll();
+      deleteApplicationRecord(application.id);
     }
   });
 
