@@ -21,10 +21,10 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20261015-1";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20261015-1";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20261015-1";
-import { extractRecruitmentFields } from "./image-import.js?v=20261015-1";
+} from "./model.js?v=20261016-1";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20261016-1";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20261016-1";
+import { extractRecruitmentFields } from "./image-import.js?v=20261016-1";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -185,7 +185,7 @@ async function importRecruitmentImage(file) {
   setImageImportBusy(true);
   setImageImportStatus("正在读取图片…");
   try {
-    const { recognizeRecruitmentImage } = await import("./image-ocr.js?v=20261015-1");
+    const { recognizeRecruitmentImage } = await import("./image-ocr.js?v=20261016-1");
     const result = await recognizeRecruitmentImage(file, {
       signal: controller.signal,
       onProgress({ value, label }) {

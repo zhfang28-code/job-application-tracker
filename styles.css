@@ -278,7 +278,9 @@ a { color: inherit; }
   z-index: 15;
   top: 0;
   display: flex;
-  min-height: 86px;
+  min-height: 104px;
+  gap: 20px;
+  padding-block: 14px;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
@@ -288,7 +290,7 @@ a { color: inherit; }
 
 .topbar h1 { margin: 1px 0 0; font-size: 21px; line-height: 1.2; letter-spacing: -0.4px; }
 .eyebrow { margin: 0; color: var(--text-faint); font-size: 10px; font-weight: 650; letter-spacing: 0.5px; }
-.topbar-actions { display: flex; align-items: center; gap: 9px; }
+.topbar-actions { display: flex; align-items: center; gap: 12px; }
 
 .button,
 .icon-button {
@@ -323,6 +325,28 @@ a { color: inherit; }
 .button-ghost { border: 1px solid var(--line); background: var(--surface); color: var(--text-soft); box-shadow: none; }
 .button-ghost:hover { border-color: var(--line-strong); color: var(--text); }
 .button-small { min-height: 33px; padding: 6px 11px; border-radius: 8px; font-size: 12px; }
+.new-application-button {
+  min-width: 244px;
+  min-height: 72px;
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 12px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  background: linear-gradient(125deg, #5968f4, #4653dd);
+  box-shadow: 0 8px 22px rgba(70, 83, 221, 0.25), inset 0 1px rgba(255, 255, 255, 0.12);
+  text-align: left;
+  white-space: nowrap;
+}
+.new-application-button:hover { background: linear-gradient(125deg, #5261ed, #3c49d3); box-shadow: 0 10px 28px rgba(70, 83, 221, 0.34), inset 0 1px rgba(255, 255, 255, 0.18); }
+.new-application-button:focus-visible { outline: 3px solid var(--primary); outline-offset: 4px; }
+.new-application-icon { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 12px; background: rgba(255, 255, 255, 0.14); }
+.new-application-icon .icon { width: 24px; height: 24px; }
+.new-application-copy { display: grid; flex: 1; gap: 3px; }
+.new-application-copy strong { font-size: 20px; font-weight: 750; line-height: 1.25; letter-spacing: 0.3px; }
+.new-application-copy small { color: rgba(255, 255, 255, 0.85); font-size: 11px; font-weight: 450; line-height: 1.4; }
+.new-application-shortcut { display: grid; width: 25px; height: 27px; flex: 0 0 auto; place-items: center; margin-left: 5px; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 7px; background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.9); font-family: var(--font); font-size: 12px; font-weight: 650; }
 .is-danger-text { color: var(--red); }
 
 .icon-button {

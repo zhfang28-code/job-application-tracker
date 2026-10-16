@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20261015-1" />
+    <link rel="stylesheet" href="./styles.css?v=20261016-1" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -137,9 +137,10 @@
               <svg class="icon theme-icon-light"><use href="#icon-moon"></use></svg>
               <svg class="icon theme-icon-dark"><use href="#icon-sun"></use></svg>
             </button>
-            <button class="button button-primary" type="button" id="add-application-button">
-              <svg class="icon"><use href="#icon-plus"></use></svg>
-              新建投递
+            <button class="button button-primary new-application-button" type="button" id="add-application-button" aria-label="新建投递" aria-keyshortcuts="N" title="新建投递（快捷键 N）">
+              <span class="new-application-icon" aria-hidden="true"><svg class="icon"><use href="#icon-plus"></use></svg></span>
+              <span class="new-application-copy"><strong>新建投递</strong><small>记录新的求职机会</small></span>
+              <kbd class="new-application-shortcut" aria-hidden="true">N</kbd>
             </button>
           </div>
         </header>
@@ -473,11 +474,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20261015-1", { updateViaCache: "none" })
+          .register("./sw.js?v=20261016-1", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20261015-1"></script>
+    <script type="module" src="./src/app.js?v=20261016-1"></script>
   </body>
 </html>
