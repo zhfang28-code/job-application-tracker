@@ -9,6 +9,7 @@ import {
   completeCurrentStage,
   completedStageIds,
   createApplication,
+  exportPayload,
   hasScheduledFollowUp,
   inferCompanyFromUrl,
   isCurrentStageCompleted,
@@ -18,6 +19,7 @@ import {
   moveToStage,
   normalizeApplication,
   parseImportPayload,
+  setOfferDecision,
   setOutcome,
   setPresentationDetails,
   skipCurrentStage,
@@ -223,8 +225,54 @@ test("进入 Offer 环节即标记为已收 Offer", () => {
 
   assert.equal(offered.currentStageId, "offer");
   assert.equal(offered.status, "offer");
+  assert.equal(offered.offerDecision, "pending");
   assert.equal(applicationProgress(offered), 100);
   assert.equal(offered.nextFollowUp, "");
+});
+
+test("Offer 可接受、拒绝或重新待决定，独立记录选择且重复保存不增加时间线", () => {
+  const offered = moveToStage(sample(), "offer", {}, NOW);
+  const accepted = setOfferDecision(offered, "accepted", { note: "确认下月入职" }, NOW);
+  const declined = setOfferDecision(accepted, "declined", { note: "选择了其他机会" }, NOW);
+  const pending = setOfferDecision(declined, "pending", {}, NOW);
+
+  assert.equal(accepted.offerDecision, "accepted");
+  assert.equal(accepted.timeline.at(-1).type, "offer-decision");
+  assert.equal(accepted.timeline.at(-1).note, "已接受 Offer：确认下月入职");
+  assert.equal(declined.offerDecision, "declined");
+  assert.equal(declined.status, "offer");
+  assert.equal(applicationCategory(declined), "offer");
+  assert.equal(pending.offerDecision, "pending");
+  assert.deepEqual(setOfferDecision(pending, "pending", {}, NOW), pending);
+  assert.equal(offered.offerDecision, "pending", "不能直接修改原记录");
+  const summary = summarize([accepted, declined, pending, setOutcome(sample(), "rejected", {}, NOW)]);
+  assert.equal(summary.offers, 3);
+  assert.equal(summary.total, summary.ongoing + summary.closed);
+  assert.equal(summary.closed, 1);
+});
+
+test("Offer 选择兼容旧数据并随备份保存，回退到其他环节后清除选择", () => {
+  const offered = moveToStage(sample(), "offer", {}, NOW);
+  const { offerDecision: _decision, ...legacy } = offered;
+  assert.equal(normalizeApplication(legacy).offerDecision, "pending");
+  assert.equal(normalizeApplication({ ...offered, offerDecision: "invalid" }).offerDecision, "pending");
+  assert.equal(normalizeApplication({ ...sample(), offerDecision: "accepted" }).offerDecision, "pending");
+
+  const accepted = setOfferDecision(offered, "accepted", {}, NOW);
+  const restored = parseImportPayload(JSON.parse(JSON.stringify(exportPayload([accepted]))))[0];
+  assert.deepEqual(restored, accepted);
+  const earlier = moveToStage(restored, "first-interview", {}, NOW);
+  assert.equal(earlier.offerDecision, "pending");
+  assert.equal(moveToStage(earlier, "offer", {}, NOW).offerDecision, "pending");
+  assert.equal(earlier.timeline.some((event) => event.type === "offer-decision"), true, "回退仍保留旧选择时间线");
+});
+
+test("非 Offer、已结束记录及无效选择不能更新 Offer 结果", () => {
+  const offered = moveToStage(sample(), "offer", {}, NOW);
+  assert.throws(() => setOfferDecision(sample(), "accepted", {}, NOW), /Offer 阶段/);
+  assert.throws(() => setOfferDecision(setOutcome(offered, "rejected", {}, NOW), "declined", {}, NOW), /Offer 阶段/);
+  assert.throws(() => setOfferDecision(setOutcome(offered, "withdrawn", {}, NOW), "accepted", {}, NOW), /Offer 阶段/);
+  assert.throws(() => setOfferDecision(offered, "invalid", {}, NOW), /请选择/);
 });
 
 test("跳过缺失环节会同时记录跳过与进入事件", () => {

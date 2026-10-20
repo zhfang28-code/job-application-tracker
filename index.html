@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20261020-1" />
+    <link rel="stylesheet" href="./styles.css?v=20261020-2" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -461,6 +461,29 @@
       </form>
     </dialog>
 
+    <dialog class="modal outcome-modal offer-decision-modal" id="offer-decision-dialog" aria-labelledby="offer-decision-title">
+      <form method="dialog" class="modal-card modal-card-small" id="offer-decision-form">
+        <header class="modal-header">
+          <div><p class="section-kicker">OFFER</p><h2 id="offer-decision-title">设置 Offer 选择</h2><p id="offer-decision-company"></p></div>
+          <button class="icon-button" type="button" data-close-dialog="offer-decision-dialog" aria-label="关闭"><svg class="icon"><use href="#icon-close"></use></svg></button>
+        </header>
+        <div class="modal-body">
+          <input type="hidden" name="applicationId" />
+          <p class="offer-decision-hint">记录你对这份 Offer 的选择，之后可以修改。三种选择均保留在 Offer 板块。</p>
+          <div class="outcome-options">
+            <label><input type="radio" name="decision" value="pending" required /><span><strong>待决定</strong><small>已收到 Offer，尚未做出选择</small></span></label>
+            <label><input type="radio" name="decision" value="accepted" required /><span><strong>已接受</strong><small>已确认接受这份 Offer</small></span></label>
+            <label><input type="radio" name="decision" value="declined" required /><span><strong>已拒绝</strong><small>你主动拒绝这份 Offer，不代表公司未通过</small></span></label>
+          </div>
+          <label class="form-field"><span>补充说明</span><textarea name="note" rows="3" maxlength="500" placeholder="可选，例如：接受原因、入职安排或拒绝原因"></textarea></label>
+        </div>
+        <footer class="modal-footer">
+          <button class="button button-ghost" type="button" data-close-dialog="offer-decision-dialog">取消</button>
+          <button class="button button-primary" type="submit">保存选择</button>
+        </footer>
+      </form>
+    </dialog>
+
     <input type="file" id="csv-import-file" accept="text/csv,.csv" hidden />
     <input type="file" id="import-file" accept="application/json,.json" hidden />
     <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
@@ -476,11 +499,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20261020-1", { updateViaCache: "none" })
+          .register("./sw.js?v=20261020-2", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20261020-1"></script>
+    <script type="module" src="./src/app.js?v=20261020-2"></script>
   </body>
 </html>

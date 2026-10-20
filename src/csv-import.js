@@ -1,11 +1,12 @@
 import {
+  OFFER_DECISION_LABELS,
   createApplication,
   makeId,
   normalizeApplication,
   normalizePipeline,
   stageById,
   toIsoDate,
-} from "./model.js?v=20261020-1";
+} from "./model.js?v=20261020-2";
 
 const HEADER_ALIASES = Object.freeze({
   company: ["单位", "公司", "公司名称", "投递公司"],
@@ -13,8 +14,9 @@ const HEADER_ALIASES = Object.freeze({
   city: ["城市|工作地", "城市/工作地", "城市", "工作地", "工作地点"],
   presentationLocation: ["宣讲地点", "宣讲会地点", "线下宣讲地点"],
   presentationAt: ["宣讲时间", "宣讲会时间", "线下宣讲时间"],
-  target: ["投递链接", "链接/邮箱", "链接／邮箱", "岗位链接", "邮箱"],
+  target: ["投递链接", "投递链接/邮箱", "链接/邮箱", "链接／邮箱", "岗位链接", "邮箱"],
   status: ["状态", "目前的进度", "目前进度", "当前进度", "进度"],
+  offerDecision: ["Offer选择", "Offer状态", "Offer决定", "录用选择"],
   assessment: ["测评|笔试", "测评/笔试", "测评", "笔试", "面试轮次"],
   appliedAt: ["投递时间", "投递日期", "申请时间", "申请日期"],
 });
@@ -136,6 +138,15 @@ function stageFromText(value) {
   return rules.find((rule) => rule.pattern.test(text))?.stageId ?? null;
 }
 
+function offerDecisionFromText(value, requireOffer = false) {
+  const text = cleanText(value).toLocaleLowerCase("zh-CN").replace(/[\s_\-/／|()（）:：·.。]/g, "");
+  if (!text || (requireOffer && !/offer|录用/.test(text))) return null;
+  if (/^(?:已)?接受(?:offer|录用)?$|^(?:offer|录用)(?:已)?接受$|^accepted$/.test(text)) return "accepted";
+  if (/^(?:已)?(?:拒绝|婉拒)(?:offer|录用)?$|^(?:offer|录用)(?:已)?(?:拒绝|婉拒)$|^declined$/.test(text)) return "declined";
+  if (/待决定|待确认|考虑中|^pending$/.test(text)) return "pending";
+  return null;
+}
+
 export function mapCsvProgress(statusValue, assessmentValue = "") {
   const statusText = cleanText(statusValue);
   const assessmentText = cleanText(assessmentValue);
@@ -150,11 +161,13 @@ export function mapCsvProgress(statusValue, assessmentValue = "") {
     ? ["assessment"]
     : [];
   let status = "active";
-  if (/人才库|拒绝|未通过|不通过|淘汰|不合适|感谢信/.test(normalizedStatus)) status = "rejected";
+  const offerDecision = stageId === "offer" ? offerDecisionFromText(statusText, true) : null;
+  if (offerDecision) status = "offer";
+  else if (/人才库|拒绝|未通过|不通过|淘汰|不合适|感谢信/.test(normalizedStatus)) status = "rejected";
   else if (/撤回|放弃|终止申请|不再考虑/.test(normalizedStatus)) status = "withdrawn";
   else if (/暂停|搁置|冻结|延期/.test(normalizedStatus)) status = "paused";
   else if (stageId === "offer") status = "offer";
-  return { raw: combined, stageId, status, priorStageIds };
+  return { raw: combined, stageId, status, priorStageIds, ...(offerDecision ? { offerDecision } : {}) };
 }
 
 export function readJobCsv(text, options = {}) {
@@ -196,6 +209,9 @@ export function readJobCsv(text, options = {}) {
     seen.add(recordKey);
     const appliedAt = parseDate(value("appliedAt"), fallbackAppliedAt);
     if (appliedAt.usedFallback) fallbackDateCount += 1;
+    const progress = mapCsvProgress(value("status"), value("assessment"));
+    const offerDecision = offerDecisionFromText(value("offerDecision"));
+    if (progress.stageId === "offer" && offerDecision) progress.offerDecision = offerDecision;
     records.push({
       recordKey,
       company,
@@ -206,7 +222,7 @@ export function readJobCsv(text, options = {}) {
       applicationTarget: target,
       appliedAt: appliedAt.value,
       hasSourceDate: !appliedAt.usedFallback,
-      progress: mapCsvProgress(value("status"), value("assessment")),
+      progress,
     });
   }
 
@@ -240,6 +256,9 @@ function applyImportedProgress(application, progress, at, isNew = false) {
   const stageChanged = targetStageId !== app.currentStageId;
   const statusChanged = progress.status !== app.status;
   const progressLabel = progress.raw || stageById(targetStageId).label;
+  const offerDecision = targetStageId === "offer"
+    ? progress.offerDecision ?? (app.currentStageId === "offer" ? app.offerDecision : "pending")
+    : "pending";
 
   if (stageChanged) {
     timeline.push(importEvent(
@@ -266,12 +285,16 @@ function applyImportedProgress(application, progress, at, isNew = false) {
   } else if (!stageChanged && statusChanged && progress.status === "active") {
     timeline.push(importEvent(targetStageId, "reopened", at, "CSV 导入：流程重新开启"));
   }
+  if (targetStageId === "offer" && offerDecision !== app.offerDecision) {
+    timeline.push(importEvent("offer", "offer-decision", at, `CSV 导入：${OFFER_DECISION_LABELS[offerDecision]} Offer`));
+  }
 
   return {
     ...app,
     pipeline,
     currentStageId: targetStageId,
     status: progress.status,
+    offerDecision,
     nextFollowUp: ["offer", "rejected", "withdrawn"].includes(progress.status)
       ? ""
       : app.nextFollowUp,
@@ -306,6 +329,7 @@ function comparisonKey(application) {
     pipeline: application.pipeline,
     currentStageId: application.currentStageId,
     status: application.status,
+    offerDecision: application.offerDecision,
     progress: application.importSource?.progress ?? "",
   });
 }

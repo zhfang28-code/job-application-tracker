@@ -1,5 +1,6 @@
 import {
   INTERVIEW_STAGE_IDS,
+  OFFER_DECISION_LABELS,
   STAGES,
   applicationCategory,
   applicationProgress,
@@ -16,16 +17,17 @@ import {
   mergeApplications,
   moveToStage,
   parseImportPayload,
+  setOfferDecision,
   setOutcome,
   setPresentationDetails,
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20261020-1";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20261020-1";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20261020-1";
-import { extractRecruitmentFields } from "./image-import.js?v=20261020-1";
-import { COMPANY_PAGE_SIZES, paginateItems, paginationPages } from "./pagination.js?v=20261020-1";
+} from "./model.js?v=20261020-2";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20261020-2";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20261020-2";
+import { extractRecruitmentFields } from "./image-import.js?v=20261020-2";
+import { COMPANY_PAGE_SIZES, paginateItems, paginationPages } from "./pagination.js?v=20261020-2";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -81,6 +83,8 @@ const elements = {
   progressForm: $("#progress-form"),
   outcomeDialog: $("#outcome-dialog"),
   outcomeForm: $("#outcome-form"),
+  offerDecisionDialog: $("#offer-decision-dialog"),
+  offerDecisionForm: $("#offer-decision-form"),
   search: $("#search-input"),
   cityFilter: $("#city-filter"),
   stageFilter: $("#stage-filter"),
@@ -192,7 +196,7 @@ async function importRecruitmentImage(file) {
   setImageImportBusy(true);
   setImageImportStatus("正在读取图片…");
   try {
-    const { recognizeRecruitmentImage } = await import("./image-ocr.js?v=20261020-1");
+    const { recognizeRecruitmentImage } = await import("./image-ocr.js?v=20261020-2");
     const result = await recognizeRecruitmentImage(file, {
       signal: controller.signal,
       onProgress({ value, label }) {
@@ -606,7 +610,20 @@ function formatDateInput(value) {
   return value ? localDateString(new Date(value)) : "";
 }
 
+function isOfferStage(application) {
+  return application.currentStageId === "offer" && !["rejected", "withdrawn"].includes(application.status);
+}
+
+function offerDecisionLabel(application) {
+  return OFFER_DECISION_LABELS[application.offerDecision] ?? OFFER_DECISION_LABELS.pending;
+}
+
 function statusLabel(application) {
+  if (isOfferStage(application)) {
+    return application.offerDecision === "accepted" || application.offerDecision === "declined"
+      ? `${offerDecisionLabel(application)} Offer`
+      : "已收 Offer · 待决定";
+  }
   const labels = {
     active: stageById(application.currentStageId).label,
     paused: "暂时搁置",
@@ -896,6 +913,12 @@ function deleteApplicationRecord(applicationId) {
   renderAll();
 }
 
+function offerDecisionTagHtml(application) {
+  if (!isOfferStage(application)) return "";
+  const decision = Object.hasOwn(OFFER_DECISION_LABELS, application.offerDecision) ? application.offerDecision : "pending";
+  return `<span class="tag offer-decision-tag is-${decision}">${icon(decision === "accepted" ? "check" : decision === "declined" ? "close" : "clock")}${offerDecisionLabel(application)}</span>`;
+}
+
 function cardHtml(application) {
   const stage = stageById(application.currentStageId);
   const overdue = isFollowUpDue(application);
@@ -910,9 +933,11 @@ function cardHtml(application) {
   const importTag = application.importSource?.format === "csv"
     ? `<span class="tag import-source-tag">CSV 导入</span>`
     : "";
-  const quickButton = !closed && application.status !== "offer"
-    ? `<button class="quick-progress" type="button" data-action="progress" data-id="${application.id}">${icon("arrow")}记录新进展</button>`
-    : "";
+  const quickButton = isOfferStage(application)
+    ? `<button class="quick-progress offer-choice-button" type="button" data-action="offer-decision" data-id="${application.id}">${icon("edit")}设置 Offer 选择</button>`
+    : !closed
+      ? `<button class="quick-progress" type="button" data-action="progress" data-id="${application.id}">${icon("arrow")}记录新进展</button>`
+      : "";
   const followUpDate = application.nextFollowUp
     ? `跟进 ${application.nextFollowUp.replaceAll("-", "/")}`
     : closed || application.status === "offer"
@@ -941,6 +966,7 @@ function cardHtml(application) {
       <div class="card-tags">
         <span class="tag stage-tag" style="${stageStyle(stage.id)}">${escapeHtml(stage.label)}</span>
         ${stageCompletionHtml(application, { includeOtherCompleted: true })}
+        ${offerDecisionTagHtml(application)}
         ${overdue ? `<span class="tag overdue-tag">待跟进</span>` : ""}
         ${statusTag}
         ${importTag}
@@ -991,15 +1017,18 @@ function renderList(items) {
           const stage = stageById(application.currentStageId);
           const progress = applicationProgress(application);
           const target = applicationTarget(application);
+          const statusStyle = isOfferStage(application)
+            ? `--stage-color:var(--${application.offerDecision === "declined" ? "red" : application.offerDecision === "accepted" ? "green" : "orange"})`
+            : stageStyle(stage.id);
           return `<tr data-open-detail="${application.id}" tabindex="0">
             <td><div class="table-company"><span class="company-avatar" style="${avatarStyle(application.company)}">${escapeHtml(companyInitial(application.company))}</span><span><strong>${escapeHtml(application.company)}</strong><small>${escapeHtml(application.position)}</small></span></div></td>
             <td>${escapeHtml(application.city || "—")}</td>
-            <td><span class="table-stage" style="${stageStyle(stage.id)}"><i class="stage-dot"></i>${escapeHtml(statusLabel(application))}</span></td>
+            <td><span class="table-stage" style="${statusStyle}"><i class="stage-dot"></i>${escapeHtml(statusLabel(application))}</span></td>
             <td class="table-completion">${stageCompletionHtml(application) || "—"}</td>
             <td>${formatDate(application.appliedAt, fullDateFormatter)}</td>
             <td><span class="table-progress"><span class="progress-track" style="${stageStyle(stage.id)}"><span style="width:${progress}%"></span></span>${progress}%</span></td>
             <td>${target.href ? `<a class="table-link" href="${escapeHtml(target.href)}" ${target.kind === "url" ? "target=\"_blank\" rel=\"noopener noreferrer\"" : ""} data-stop-detail>${escapeHtml(target.kind === "email" ? "发送邮件" : "查看链接")}</a>` : escapeHtml(target.value || "—")}</td>
-            <td><button class="table-delete" type="button" data-action="delete" data-id="${application.id}" aria-label="删除${escapeHtml(application.company)}的投递记录">${icon("trash")}删除</button></td>
+            <td><div class="table-actions">${isOfferStage(application) ? `<button class="table-offer-decision" type="button" data-action="offer-decision" data-id="${application.id}" aria-label="设置${escapeHtml(application.company)}的 Offer 选择">Offer 选择</button>` : ""}<button class="table-delete" type="button" data-action="delete" data-id="${application.id}" aria-label="删除${escapeHtml(application.company)}的投递记录">${icon("trash")}删除</button></div></td>
           </tr>`;
         }).join("")}
       </tbody>
@@ -1198,8 +1227,8 @@ function routeHtml(application) {
 }
 
 function timelineHtml(application) {
-  const typeLabels = { entered: "进入", completed: "完成", skipped: "跳过", reopened: "重开" };
-  const eventColors = { entered: "#5b6cf9", completed: "#0ca678", skipped: "#9298aa", reopened: "#e68a17" };
+  const typeLabels = { entered: "进入", completed: "完成", skipped: "跳过", reopened: "重开", "offer-decision": "选择" };
+  const eventColors = { entered: "#5b6cf9", completed: "#0ca678", skipped: "#9298aa", reopened: "#e68a17", "offer-decision": "#0ca678" };
   const timeline = [...application.timeline].sort((a, b) => new Date(b.at) - new Date(a.at));
   if (!timeline.length) return `<p class="detail-notes is-empty">尚无进展记录</p>`;
   return `<div class="timeline">${timeline.map((event) => `
@@ -1222,13 +1251,15 @@ function renderDetail(applicationId) {
   const stage = stageById(application.currentStageId);
   const target = applicationTarget(application);
   const closed = ["rejected", "withdrawn"].includes(application.status);
-  const statusClass = application.status === "offer" ? " is-offer" : closed ? " is-closed" : "";
-  const primaryAction = !closed && application.status !== "offer"
-    ? `<button class="button button-primary" type="button" data-detail-action="progress">${icon("arrow")}记录公司通知的下一步</button>`
-    : application.status === "offer"
-      ? `<button class="button button-ghost" type="button" data-detail-action="status">${icon("sparkle")}更新最终状态</button>`
+  const statusClass = isOfferStage(application)
+    ? ` is-offer is-offer-${Object.hasOwn(OFFER_DECISION_LABELS, application.offerDecision) ? application.offerDecision : "pending"}`
+    : closed ? " is-closed" : "";
+  const primaryAction = isOfferStage(application)
+    ? `<button class="button button-primary" type="button" data-detail-action="offer-decision">${icon("edit")}设置 Offer 选择</button>`
+    : !closed
+      ? `<button class="button button-primary" type="button" data-detail-action="progress">${icon("arrow")}记录公司通知的下一步</button>`
       : `<button class="button button-primary" type="button" data-detail-action="status">${icon("arrow")}重新开启流程</button>`;
-  const visibleStatusAction = !closed && application.status !== "offer"
+  const visibleStatusAction = !closed
     ? `<button class="button button-ghost detail-status-action" type="button" data-detail-action="status">${icon("more")}更新流程状态</button>`
     : "";
   const jumpOptions = application.pipeline.map((stageId) => `<option value="${stageId}" ${stageId === application.currentStageId ? "selected" : ""}>${escapeHtml(stageById(stageId).label)}</option>`).join("");
@@ -1350,6 +1381,26 @@ function openOutcome(applicationId) {
   elements.outcomeDialog.showModal();
 }
 
+function openOfferDecision(applicationId) {
+  const application = applications.find((item) => item.id === applicationId);
+  if (!application || !isOfferStage(application)) return;
+  elements.offerDecisionForm.reset();
+  elements.offerDecisionForm.elements.applicationId.value = application.id;
+  const decision = Object.hasOwn(OFFER_DECISION_LABELS, application.offerDecision) ? application.offerDecision : "pending";
+  elements.offerDecisionForm.elements.decision.value = decision;
+  $("#offer-decision-company").textContent = `${application.company} · ${application.position}`;
+  elements.offerDecisionDialog.showModal();
+}
+
+function saveOfferDecisionRecord(applicationId, decision, note = "") {
+  const existing = applications.find((item) => item.id === applicationId);
+  if (!existing) throw new Error("这条投递记录已不存在");
+  const updated = setOfferDecision(existing, decision, { note });
+  updateApplicationInState(updated);
+  persist(`Offer 选择已保存：${offerDecisionLabel(updated)}`);
+  renderAll();
+}
+
 function updateApplicationInState(updated) {
   applications = applications.map((application) => application.id === updated.id ? updated : application);
   applications.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
@@ -1387,7 +1438,7 @@ function safeCsvCell(value) {
 }
 
 function exportCsv() {
-  const headers = ["公司", "岗位", "城市", "宣讲地点", "宣讲时间", "当前进度", "状态", "投递日期", "下次跟进", "薪资", "投递链接/邮箱", "标签", "备注"];
+  const headers = ["公司", "岗位", "城市", "宣讲地点", "宣讲时间", "当前进度", "状态", "Offer选择", "投递日期", "下次跟进", "薪资", "投递链接/邮箱", "标签", "备注"];
   const rows = applications.map((application) => [
     application.company,
     application.position,
@@ -1396,6 +1447,7 @@ function exportCsv() {
     application.presentationAt,
     stageById(application.currentStageId).label,
     statusLabel(application),
+    application.currentStageId === "offer" ? offerDecisionLabel(application) : "",
     formatDateInput(application.appliedAt),
     application.nextFollowUp,
     application.salary,
@@ -1558,7 +1610,7 @@ function setupEventListeners() {
     button.addEventListener("click", () => document.getElementById(button.dataset.closeDialog)?.close());
   });
 
-  [elements.applicationDialog, elements.detailDialog, elements.progressDialog, elements.outcomeDialog].forEach((dialog) => {
+  [elements.applicationDialog, elements.detailDialog, elements.progressDialog, elements.outcomeDialog, elements.offerDecisionDialog].forEach((dialog) => {
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
     });
@@ -1673,6 +1725,20 @@ function setupEventListeners() {
     renderAll();
   });
 
+  elements.offerDecisionForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    try {
+      saveOfferDecisionRecord(
+        formValue(elements.offerDecisionForm, "applicationId"),
+        formValue(elements.offerDecisionForm, "decision"),
+        formValue(elements.offerDecisionForm, "note"),
+      );
+      elements.offerDecisionDialog.close();
+    } catch (error) {
+      showToast(error.message || "Offer 选择保存失败", "error");
+    }
+  });
+
   document.addEventListener("click", (event) => {
     const pageButton = event.target.closest("[data-company-page]");
     if (pageButton) {
@@ -1686,6 +1752,7 @@ function setupEventListeners() {
       event.stopPropagation();
       const applicationId = actionButton.dataset.id;
       if (actionButton.dataset.action === "progress") openProgress(applicationId);
+      if (actionButton.dataset.action === "offer-decision") openOfferDecision(applicationId);
       if (actionButton.dataset.action === "details") openDetail(applicationId);
       if (actionButton.dataset.action === "delete") deleteApplicationRecord(applicationId);
       return;
@@ -1712,6 +1779,7 @@ function setupEventListeners() {
     if (action === "progress") openProgress(application.id);
     if (action === "edit") openApplicationForm(application);
     if (action === "status") openOutcome(application.id);
+    if (action === "offer-decision") openOfferDecision(application.id);
     if (action === "complete-stage") {
       const stageId = button.dataset.stageId;
       if (stageId === application.currentStageId) {

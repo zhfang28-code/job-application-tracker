@@ -15,6 +15,11 @@ export const STAGES = Object.freeze([
 
 export const DEFAULT_PIPELINE = STAGES.map((stage) => stage.id);
 export const INITIAL_PIPELINE = Object.freeze(["applied", "offer"]);
+export const OFFER_DECISION_LABELS = Object.freeze({
+  pending: "待决定",
+  accepted: "已接受",
+  declined: "已拒绝",
+});
 export const STAGE_IDS = new Set(DEFAULT_PIPELINE);
 export const INTERVIEW_STAGE_IDS = new Set([
   "ai-interview",
@@ -340,6 +345,7 @@ export function createApplication(input = {}, now = new Date()) {
     pipeline,
     currentStageId: pipeline[0],
     status: "active",
+    offerDecision: "pending",
     timeline: [
       {
         id: makeId("event"),
@@ -364,7 +370,7 @@ export function normalizeApplication(raw) {
         .map((event) => ({
           id: cleanText(event.id) || makeId("event"),
           stageId: event.stageId,
-          type: ["entered", "completed", "skipped", "reopened"].includes(event.type)
+          type: ["entered", "completed", "skipped", "reopened", "offer-decision"].includes(event.type)
             ? event.type
             : "completed",
           at: toIsoDate(event.at),
@@ -401,6 +407,9 @@ export function normalizeApplication(raw) {
     pipeline,
     currentStageId,
     status,
+    offerDecision: currentStageId === "offer" && Object.hasOwn(OFFER_DECISION_LABELS, raw?.offerDecision)
+      ? raw.offerDecision
+      : "pending",
     timeline,
     importSource,
     createdAt: timestamp,
@@ -606,6 +615,37 @@ export function skipCurrentStage(application, details = {}, now = new Date()) {
   };
 }
 
+export function setOfferDecision(application, decision, details = {}, now = new Date()) {
+  if (!Object.hasOwn(OFFER_DECISION_LABELS, decision)) {
+    throw new Error("请选择待决定、已接受或已拒绝");
+  }
+  const app = normalizeApplication(application);
+  if (app.currentStageId !== "offer" || ["rejected", "withdrawn"].includes(app.status)) {
+    throw new Error("只能为尚未结束的 Offer 阶段设置选择");
+  }
+  const note = cleanText(details.note);
+  if (app.offerDecision === decision && !note) return app;
+  const timestamp = toIsoDate(details.at ?? now);
+  const label = OFFER_DECISION_LABELS[decision];
+  return {
+    ...app,
+    status: "offer",
+    offerDecision: decision,
+    nextFollowUp: "",
+    timeline: [
+      ...app.timeline,
+      {
+        id: makeId("event"),
+        stageId: "offer",
+        type: "offer-decision",
+        at: timestamp,
+        note: `${label} Offer${note ? `：${note}` : ""}`,
+      },
+    ],
+    updatedAt: timestamp,
+  };
+}
+
 export function setOutcome(application, status, details = {}, now = new Date()) {
   if (!["rejected", "withdrawn", "paused", "active"].includes(status)) {
     throw new Error(`Unsupported application status: ${status}`);
@@ -681,6 +721,7 @@ export function moveToStage(application, targetStageId, details = {}, now = new 
     ...app,
     currentStageId: targetStageId,
     status: targetStageId === "offer" ? "offer" : "active",
+    offerDecision: "pending",
     ...resolvePresentationDetails(app, details),
     nextFollowUp: cleanText(details.nextFollowUp),
     timeline,

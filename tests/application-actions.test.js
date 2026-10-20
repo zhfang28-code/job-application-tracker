@@ -5,6 +5,7 @@ import vm from "node:vm";
 import * as model from "../src/model.js";
 import * as pagination from "../src/pagination.js";
 import { saveApplications } from "../src/storage.js";
+import { mergeCsvApplications, readJobCsv } from "../src/csv-import.js";
 
 const NOW = new Date("2026-10-15T08:00:00Z");
 const source = (await readFile(new URL("../src/app.js", import.meta.url), "utf8"))
@@ -133,4 +134,53 @@ test("删除最后一页唯一公司后自动回上一页，更改每页数量�
   assert.equal(vm.runInContext("companyPage", ui.context), 1);
   assert.equal(ui.preferences.get("company-page-size"), "24");
   assert.equal((ui.nodes.get("#list-view").innerHTML.match(/<tr data-open-detail=/g) ?? []).length, 24);
+});
+
+test("Offer 公司卡片、列表及详情显示选择结果并提供修改入口，已结束记录不提供入口", () => {
+  const records = [
+    application("待决定公司", "offer"),
+    model.setOfferDecision(application("接受公司", "offer"), "accepted", {}, NOW),
+    model.setOfferDecision(application("拒绝公司", "offer"), "declined", {}, NOW),
+  ];
+  const ui = loadUi(records);
+  for (const record of records) {
+    ui.context.record = record;
+    const card = vm.runInContext("cardHtml(record)", ui.context);
+    assert.match(card, new RegExp(`offer-decision-tag is-${record.offerDecision}`));
+    assert.match(card, /data-action="offer-decision"/);
+    assert.match(card, new RegExp(model.OFFER_DECISION_LABELS[record.offerDecision]));
+    vm.runInContext("renderDetail(record.id)", ui.context);
+    assert.match(ui.nodes.get("#detail-content").innerHTML, /data-detail-action="offer-decision"/);
+    assert.match(ui.nodes.get("#detail-content").innerHTML, new RegExp(model.OFFER_DECISION_LABELS[record.offerDecision]));
+  }
+  vm.runInContext("renderList(applications)", ui.context);
+  const list = ui.nodes.get("#list-view").innerHTML;
+  assert.equal((list.match(/data-action="offer-decision"/g) ?? []).length, 3);
+  assert.match(list, /已接受 Offer/);
+  assert.match(list, /已拒绝 Offer/);
+  ui.context.record = model.setOutcome(records[0], "rejected", {}, NOW);
+  assert.doesNotMatch(vm.runInContext("cardHtml(record)", ui.context), /data-action="offer-decision"/);
+});
+
+test("保存 Offer 选择只影响指定公司并持久化，导出 CSV 后可还原选择", () => {
+  const first = application("同名公司", "offer");
+  const second = application("同名公司", "offer");
+  const ui = loadUi([first, second]);
+  ui.context.recordId = first.id;
+  vm.runInContext("saveOfferDecisionRecord(recordId, 'declined', '薪资不符合预期')", ui.context);
+  const saved = JSON.parse(ui.storage.get(model.STORAGE_KEY)).applications;
+  assert.equal(saved.find((record) => record.id === first.id).offerDecision, "declined");
+  assert.equal(saved.find((record) => record.id === second.id).offerDecision, "pending");
+  assert.equal(ui.renders, 1);
+  assert.throws(() => vm.runInContext("saveOfferDecisionRecord('missing', 'accepted')", ui.context), /已不存在/);
+
+  // Use distinct identities so CSV de-duplication keeps all three choice states.
+  const records = [application("待决定", "offer"), model.setOfferDecision(application("接受", "offer"), "accepted", {}, NOW), model.setOfferDecision(application("拒绝", "offer"), "declined", {}, NOW)];
+  ui.context.records = records;
+  let csv;
+  ui.context.captureCsv = (content) => { csv = content; };
+  vm.runInContext("applications = records; downloadFile = captureCsv; exportCsv();", ui.context);
+  const restored = mergeCsvApplications([], readJobCsv(csv).records, { importedAt: NOW });
+  assert.deepEqual(restored.applications.map((record) => record.offerDecision).sort(), ["accepted", "declined", "pending"]);
+  assert.equal(restored.applications.every((record) => record.status === "offer"), true);
 });

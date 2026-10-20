@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createApplication } from "../src/model.js";
+import { createApplication, moveToStage, setOfferDecision } from "../src/model.js";
 import {
   mapCsvProgress,
   mergeCsvApplications,
@@ -124,4 +124,41 @@ test("缺少公司或岗位列时给出明确错误", () => {
     () => readJobCsv("城市,状态\n上海,已投递", { fallbackAppliedAt: FALLBACK_DATE }),
     /公司（单位）、岗位/,
   );
+});
+
+test("CSV 区分本人拒绝 Offer 与公司拒绝，不把已拒绝 Offer 归为未通过", () => {
+  for (const [label, decision] of [["已接受 Offer", "accepted"], ["已拒绝 Offer", "declined"], ["已收 Offer · 待决定", "pending"]]) {
+    const progress = mapCsvProgress(label);
+    assert.equal(progress.stageId, "offer");
+    assert.equal(progress.status, "offer");
+    assert.equal(progress.offerDecision, decision);
+  }
+  assert.equal(mapCsvProgress("拒绝").status, "rejected");
+  assert.equal(mapCsvProgress("Offer 未通过").status, "rejected");
+  assert.equal(mapCsvProgress("人才库").status, "rejected");
+});
+
+test("CSV Offer 选择列可导入和更新，重复导入不新增选择记录", () => {
+  const csv = (choice) => `公司,岗位,状态,Offer选择,投递链接/邮箱\n星河科技,工程师,Offer,${choice},https://jobs.example.com/offer`;
+  const first = mergeCsvApplications([], readJobCsv(csv("已接受")).records, { importedAt: IMPORTED_AT });
+  assert.equal(first.applications[0].offerDecision, "accepted");
+  assert.equal(first.applications[0].jobUrl, "https://jobs.example.com/offer");
+  const records = readJobCsv(csv("已拒绝")).records;
+  const second = mergeCsvApplications(first.applications, records, { importedAt: "2026-08-31T08:00:00.000Z" });
+  assert.equal(second.stats.updated, 1);
+  assert.equal(second.applications[0].offerDecision, "declined");
+  assert.equal(second.applications[0].status, "offer");
+  assert.equal(second.applications[0].timeline.at(-1).type, "offer-decision");
+  const repeated = mergeCsvApplications(second.applications, records, { importedAt: "2026-09-01T08:00:00.000Z" });
+  assert.equal(repeated.stats.unchanged, 1);
+  assert.equal(repeated.applications[0].timeline.length, second.applications[0].timeline.length);
+  const reset = mergeCsvApplications(repeated.applications, readJobCsv(csv("待决定")).records, { importedAt: "2026-09-02T08:00:00.000Z" });
+  assert.equal(reset.applications[0].offerDecision, "pending");
+});
+
+test("CSV 仅更新收到 Offer 时，不覆盖已有的本地选择", () => {
+  const existing = setOfferDecision(moveToStage(createApplication({ company: "星河科技", position: "工程师" }, new Date(IMPORTED_AT)), "offer"), "accepted");
+  const records = readJobCsv("公司,岗位,状态\n星河科技,工程师,Offer").records;
+  const result = mergeCsvApplications([existing], records, { importedAt: IMPORTED_AT });
+  assert.equal(result.applications[0].offerDecision, "accepted");
 });
