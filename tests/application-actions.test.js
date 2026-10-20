@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import * as model from "../src/model.js";
+import * as pagination from "../src/pagination.js";
 import { saveApplications } from "../src/storage.js";
 
 const NOW = new Date("2026-10-15T08:00:00Z");
@@ -14,29 +15,36 @@ function loadUi(applications, confirmed = true) {
   const nodes = new Map();
   const storage = new Map();
   const confirmations = [];
+  const preferences = new Map();
   let renders = 0;
   const element = (selector) => {
     if (!nodes.has(selector)) nodes.set(selector, {
       innerHTML: "",
       open: false,
+      classList: { toggle() {} },
       close() { this.open = false; },
       append() {},
+      replaceChildren() { this.innerHTML = ""; },
+      scrollIntoView() {},
+      focus() {},
     });
     return nodes.get(selector);
   };
   const context = vm.createContext({
     ...model,
+    ...pagination,
     console,
     loadApplications: () => applications,
     loadPreference: (_key, fallback) => fallback,
+    savePreference: (key, value) => preferences.set(key, String(value)),
     saveApplications: (records) => saveApplications(records, { setItem: (key, value) => storage.set(key, value) }),
-    document: { querySelector: element, createElement: () => element("toast") },
+    document: { querySelector: element, querySelectorAll: () => [], createElement: () => element("toast") },
     window: { confirm: (message) => { confirmations.push(message); return confirmed; }, setTimeout() {} },
     countRender: () => { renders += 1; },
   });
   vm.runInContext(source, context);
   vm.runInContext("renderAll = () => { countRender(); renderList(applications); };", context);
-  return { context, nodes, storage, confirmations, get renders() { return renders; } };
+  return { context, nodes, storage, confirmations, preferences, get renders() { return renders; } };
 }
 
 function application(company, stage = "assessment") {
@@ -91,4 +99,38 @@ test("确认删除只移除指定投递，保留同名公司的其他记录并�
   assert.equal(ui.renders, 1);
   assert.match(ui.nodes.get("#list-view").innerHTML, new RegExp(second.id));
   assert.doesNotMatch(ui.nodes.get("#list-view").innerHTML, new RegExp(first.id));
+});
+
+test("看板与列表只渲染本页公司，切换视图保留页码，筛选后回第一页", () => {
+  const records = Array.from({ length: 25 }, (_, index) => application(`分页公司${index}`));
+  const ui = loadUi(records);
+  vm.runInContext("renderWorkspace(); changeCompanyPage(2);", ui.context);
+  assert.equal(vm.runInContext("companyPage", ui.context), 2);
+  assert.equal(ui.nodes.get("#visible-count").textContent, "25 个机会");
+  assert.equal((ui.nodes.get("#pipeline-board").innerHTML.match(/data-application-id=/g) ?? []).length, 12);
+  assert.equal((ui.nodes.get("#list-view").innerHTML.match(/<tr data-open-detail=/g) ?? []).length, 12);
+  assert.match(ui.nodes.get("#company-pagination-top").innerHTML, /13–24/);
+  vm.runInContext("view = 'list'; renderWorkspace();", ui.context);
+  assert.equal(vm.runInContext("companyPage", ui.context), 2);
+  vm.runInContext("filters.search = '分页公司24'; renderWorkspace();", ui.context);
+  assert.equal(vm.runInContext("companyPage", ui.context), 1);
+  assert.equal(ui.nodes.get("#visible-count").textContent, "1 个机会");
+  vm.runInContext("filters.search = '没有这样的公司'; renderWorkspace();", ui.context);
+  assert.equal(ui.nodes.get("#company-pagination-top").hidden, true);
+  assert.equal(ui.nodes.get("#company-pagination-bottom").hidden, true);
+});
+
+test("删除最后一页唯一公司后自动回上一页，更改每页数量从第一页开始并保存偏好", () => {
+  const records = Array.from({ length: 25 }, (_, index) => application(`边界公司${index}`));
+  const ui = loadUi(records);
+  ui.context.recordId = records.at(-1).id;
+  vm.runInContext("renderAll = () => renderWorkspace(); renderWorkspace(); changeCompanyPage(3); deleteApplicationRecord(recordId);", ui.context);
+  assert.equal(vm.runInContext("companyPage", ui.context), 2);
+  assert.equal(ui.nodes.get("#visible-count").textContent, "24 个机会");
+  assert.match(ui.nodes.get("#company-pagination-top").innerHTML, /13–24/);
+  assert.match(ui.nodes.get("#pipeline-board").innerHTML, /12 \/ 24/);
+  vm.runInContext("changeCompanyPageSize(24)", ui.context);
+  assert.equal(vm.runInContext("companyPage", ui.context), 1);
+  assert.equal(ui.preferences.get("company-page-size"), "24");
+  assert.equal((ui.nodes.get("#list-view").innerHTML.match(/<tr data-open-detail=/g) ?? []).length, 24);
 });

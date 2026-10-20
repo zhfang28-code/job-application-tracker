@@ -21,10 +21,11 @@ import {
   stageById,
   summarize,
   updateApplication,
-} from "./model.js?v=20261016-1";
-import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20261016-1";
-import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20261016-1";
-import { extractRecruitmentFields } from "./image-import.js?v=20261016-1";
+} from "./model.js?v=20261020-1";
+import { mergeCsvApplications, readJobCsv } from "./csv-import.js?v=20261020-1";
+import { loadApplications, loadPreference, removePreference, saveApplications, savePreference } from "./storage.js?v=20261020-1";
+import { extractRecruitmentFields } from "./image-import.js?v=20261020-1";
+import { COMPANY_PAGE_SIZES, paginateItems, paginationPages } from "./pagination.js?v=20261020-1";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -47,6 +48,12 @@ let filters = {
   stage: "all",
   quick: "all",
 };
+let companyPage = 1;
+let companyPageSize = COMPANY_PAGE_SIZES.includes(Number(loadPreference("company-page-size", "12")))
+  ? Number(loadPreference("company-page-size", "12"))
+  : 12;
+let companyPageFilterKey = null;
+let companyTotalPages = 1;
 
 const QUICK_FILTERS = new Set(["all", "followup", "ongoing", "presentation", "assessment", "interviewing", "offer", "closed"]);
 const QUICK_FILTER_TITLES = Object.freeze({
@@ -185,7 +192,7 @@ async function importRecruitmentImage(file) {
   setImageImportBusy(true);
   setImageImportStatus("正在读取图片…");
   try {
-    const { recognizeRecruitmentImage } = await import("./image-ocr.js?v=20261016-1");
+    const { recognizeRecruitmentImage } = await import("./image-ocr.js?v=20261020-1");
     const result = await recognizeRecruitmentImage(file, {
       signal: controller.signal,
       onProgress({ value, label }) {
@@ -651,6 +658,7 @@ function updateQuickFilterControls() {
 
 function applyQuickFilter(quickFilter, { scroll = true } = {}) {
   if (!QUICK_FILTERS.has(quickFilter)) return;
+  companyPage = 1;
   const filterChanged = filters.quick !== quickFilter;
   filters.quick = quickFilter;
 
@@ -949,7 +957,7 @@ function cardHtml(application) {
     </article>`;
 }
 
-function renderBoard(items) {
+function renderBoard(items, allItems = items) {
   const columns = currentBoardColumns();
   elements.board.classList.toggle("is-card-grid", ["followup", "presentation", "assessment"].includes(filters.quick));
 
@@ -957,15 +965,18 @@ function renderBoard(items) {
     const cards = filters.quick === "followup"
       ? items
       : items.filter((application) => outcomeColumn(application) === column.id);
+    const totalCount = filters.quick === "followup"
+      ? allItems.length
+      : allItems.filter((application) => outcomeColumn(application) === column.id).length;
     return `
       <section class="board-column${cards.length ? "" : " is-empty"}" data-stage-target="${column.id}" style="--stage-color:${column.color}" aria-labelledby="column-${column.id}">
         <header class="board-column-header">
           <span class="stage-dot"></span>
           <h3 id="column-${column.id}">${escapeHtml(column.label)}</h3>
-          <span class="column-count">${cards.length}</span>
+          <span class="column-count" title="本页 ${cards.length} 条 / 筛选结果共 ${totalCount} 条">${cards.length === totalCount ? cards.length : `${cards.length} / ${totalCount}`}</span>
         </header>
         <div class="column-cards">
-          ${cards.length ? cards.map(cardHtml).join("") : `<div class="column-empty">暂无记录</div>`}
+          ${cards.length ? cards.map(cardHtml).join("") : `<div class="column-empty">${totalCount ? "本页暂无记录，可翻页查看" : "暂无记录"}</div>`}
         </div>
       </section>`;
   }).join("");
@@ -1060,17 +1071,76 @@ function renderFollowUps() {
   }).join("");
 }
 
+function renderCompanyPagination(pagination) {
+  const previous = `<button type="button" class="pagination-button" data-company-page="${pagination.page - 1}" ${pagination.page === 1 ? "disabled" : ""} aria-label="上一页公司" aria-controls="pipeline-board list-view">上一页</button>`;
+  const next = `<button type="button" class="pagination-button" data-company-page="${pagination.page + 1}" ${pagination.page === pagination.totalPages ? "disabled" : ""} aria-label="下一页公司" aria-controls="pipeline-board list-view">下一页</button>`;
+  const pages = paginationPages(pagination.page, pagination.totalPages).map((page) => page === "ellipsis"
+    ? `<span class="pagination-ellipsis" aria-hidden="true">…</span>`
+    : `<button type="button" class="pagination-button pagination-number${page === pagination.page ? " is-current" : ""}" data-company-page="${page}" ${page === pagination.page ? 'aria-current="page"' : ""} aria-label="第 ${page} 页" aria-controls="pipeline-board list-view">${page}</button>`).join("");
+  const jump = `<form class="pagination-jump" data-company-page-jump>
+    <label>跳至 <input type="number" name="page" min="1" max="${pagination.totalPages}" step="1" required inputmode="numeric" autocomplete="off" aria-label="要跳转到的页码" /> 页</label>
+    <button type="submit" class="pagination-button">前往</button>
+  </form>`;
+  const top = $("#company-pagination-top");
+  const bottom = $("#company-pagination-bottom");
+  top.hidden = pagination.total === 0;
+  bottom.hidden = pagination.total === 0;
+  if (!pagination.total) {
+    top.replaceChildren();
+    bottom.replaceChildren();
+    return;
+  }
+  top.innerHTML = `
+    <span class="pagination-summary" role="status">本页 <strong>${pagination.start}–${pagination.end}</strong> 条，共 <strong>${pagination.total}</strong> 条投递</span>
+    <div class="pagination-top-actions">
+      <label class="pagination-size">每页 <select data-company-page-size aria-label="每页展示数量">${COMPANY_PAGE_SIZES.map((size) => `<option value="${size}"${size === pagination.pageSize ? " selected" : ""}>${size} 条</option>`).join("")}</select></label>
+      <span class="pagination-position">第 ${pagination.page} / ${pagination.totalPages} 页</span>
+      ${previous}${next}${jump}
+    </div>`;
+  bottom.innerHTML = `
+    <div class="pagination-pages">${previous}${pages}${next}</div>
+    ${jump}`;
+}
+
+function changeCompanyPage(requestedPage) {
+  const page = Number(requestedPage);
+  if (!Number.isInteger(page)) return;
+  const nextPage = Math.min(companyTotalPages, Math.max(1, page));
+  if (nextPage === companyPage) return;
+  companyPage = nextPage;
+  renderWorkspace();
+  $("#pipeline-heading").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("#company-pagination-top").focus({ preventScroll: true });
+}
+
+function changeCompanyPageSize(requestedSize) {
+  const size = Number(requestedSize);
+  if (!COMPANY_PAGE_SIZES.includes(size)) return;
+  companyPageSize = size;
+  companyPage = 1;
+  savePreference("company-page-size", size);
+  renderWorkspace();
+  $("#company-pagination-top [data-company-page-size]").focus({ preventScroll: true });
+}
+
 function renderWorkspace() {
   const items = getFilteredApplications();
+  const filterKey = JSON.stringify(filters);
+  if (filterKey !== companyPageFilterKey) companyPage = 1;
+  companyPageFilterKey = filterKey;
+  const pagination = paginateItems(items, companyPage, companyPageSize);
+  companyPage = pagination.page;
+  companyTotalPages = pagination.totalPages;
   $("#pipeline-heading").textContent = QUICK_FILTER_TITLES[filters.quick] ?? QUICK_FILTER_TITLES.all;
   $("#visible-count").textContent = `${items.length} 个机会`;
   elements.board.classList.toggle("is-hidden", view !== "board" || items.length === 0);
   elements.list.classList.toggle("is-hidden", view !== "list" || items.length === 0);
   elements.empty.classList.toggle("is-hidden", items.length !== 0);
+  renderCompanyPagination(pagination);
 
   if (items.length) {
-    renderBoard(items);
-    renderList(items);
+    renderBoard(pagination.items, items);
+    renderList(pagination.items);
   } else {
     elements.board.replaceChildren();
     elements.list.replaceChildren();
@@ -1286,6 +1356,7 @@ function updateApplicationInState(updated) {
 }
 
 function resetFilters() {
+  companyPage = 1;
   filters = { search: "", city: "all", stage: "all", quick: "all" };
   elements.search.value = "";
   renderAll();
@@ -1514,6 +1585,7 @@ function setupEventListeners() {
     } else {
       const created = createApplication(payload);
       applications.unshift(created);
+      companyPage = 1;
       persist("投递已创建，开始记录进展");
       activeDetailId = created.id;
     }
@@ -1602,6 +1674,11 @@ function setupEventListeners() {
   });
 
   document.addEventListener("click", (event) => {
+    const pageButton = event.target.closest("[data-company-page]");
+    if (pageButton) {
+      if (!pageButton.disabled) changeCompanyPage(pageButton.dataset.companyPage);
+      return;
+    }
     const stopDetail = event.target.closest("[data-stop-detail]");
     if (stopDetail) return;
     const actionButton = event.target.closest("[data-action]");
@@ -1615,6 +1692,15 @@ function setupEventListeners() {
     }
     const opener = event.target.closest("[data-open-detail]");
     if (opener) openDetail(opener.dataset.openDetail);
+  });
+
+  document.addEventListener("change", (event) => {
+    if (event.target.matches("[data-company-page-size]")) changeCompanyPageSize(event.target.value);
+  });
+  document.addEventListener("submit", (event) => {
+    if (!event.target.matches("[data-company-page-jump]")) return;
+    event.preventDefault();
+    changeCompanyPage(new FormData(event.target).get("page"));
   });
 
   elements.detailContent.addEventListener("click", (event) => {

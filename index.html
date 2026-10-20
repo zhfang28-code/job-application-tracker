@@ -11,7 +11,7 @@
     <title>JobTrail 职迹｜求职投递进度管理</title>
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20261016-1" />
+    <link rel="stylesheet" href="./styles.css?v=20261020-1" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -230,8 +230,10 @@
             </div>
           </div>
 
+          <nav class="company-pagination company-pagination-top" id="company-pagination-top" tabindex="-1" aria-label="公司展示分页" hidden></nav>
           <div class="pipeline-board" id="pipeline-board" aria-live="polite"></div>
           <div class="list-view is-hidden" id="list-view" aria-live="polite"></div>
+          <nav class="company-pagination company-pagination-bottom" id="company-pagination-bottom" aria-label="公司展示底部分页" hidden></nav>
 
           <div class="empty-state is-hidden" id="empty-state">
             <div class="empty-illustration" aria-hidden="true">
@@ -474,11 +476,11 @@
           window.location.reload();
         });
         navigator.serviceWorker
-          .register("./sw.js?v=20261016-1", { updateViaCache: "none" })
+          .register("./sw.js?v=20261020-1", { updateViaCache: "none" })
           .then((registration) => registration.update())
           .catch(console.warn);
       })();
     </script>
-    <script type="module" src="./src/app.js?v=20261016-1"></script>
+    <script type="module" src="./src/app.js?v=20261020-1"></script>
   </body>
 </html>
